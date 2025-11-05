@@ -1,0 +1,116 @@
+{
+  "dashboard": {
+    "projetos": 4,
+    "concluidas": 15,
+    "pendentes": 6
+  },
+  "atividades": [
+    {
+      "id": "648e",
+      "createdAt": "2025-08-28T22:49:01.189Z",
+      "completedAt": "2025-08-28T23:05:48.074Z",
+      "title": "Correção e manutenção dos pontos de rede academicos",
+      "description": "Verificação e correção de todos os pontos de rede academicos dos laboratórios 1 e 2",
+      "status": "finalizada",
+      "comentarios": [
+        {
+          "autor": "admin",
+          "texto": "Alguns pontos estão falhando, faltando pares no cabo de rede, solicitar nova passagem de cabo"
+        }
+      ],
+      "autor": "admin",
+      "assignedTo": "user",
+      "concluidoPor": "admin"
+    },
+    {
+      "id": "e345",
+      "createdAt": "2025-08-28T22:50:28.225Z",
+      "completedAt": "2025-08-28T23:05:47.277Z",
+      "title": "Manutenção de cameras",
+      "description": "Verificar todas as cameras que não estão funcionando, identificar os problemas e buscar a solução.",
+      "status": "finalizada",
+      "comentarios": [
+        {
+          "autor": "admin",
+          "texto": "Cabos que estiverem rompidos, solicitar a manutenção uma nova passagem de cabo."
+        }
+      ],
+      "autor": "admin",
+      "assignedTo": "admin",
+      "concluidoPor": "admin"
+    },
+    {
+      "id": "1e12",
+      "createdAt": "2025-08-28T22:51:25.115Z",
+      "completedAt": "2025-08-28T22:51:29.575Z",
+      "title": "Telefonia",
+      "description": "Fazer alterações solicitadas nos ramais do PABX e salvar um novo backup.",
+      "status": "finalizada",
+      "comentarios": [],
+      "autor": "admin",
+      "assignedTo": "user",
+      "concluidoPor": "admin"
+    },
+    {
+      "id": "de87",
+      "createdAt": "2025-08-28T22:52:37.371Z",
+      "completedAt": "2025-08-28T22:52:40.981Z",
+      "title": "Manutenção PC Coordenação",
+      "description": "Problema na fonte",
+      "status": "finalizada",
+      "comentarios": [],
+      "autor": "admin",
+      "assignedTo": "admin",
+      "concluidoPor": "admin"
+    },
+    {
+      "id": "2087",
+      "createdAt": "2025-08-30T23:31:45.834Z",
+      "completedAt": "2025-08-30T23:39:25.352Z",
+      "title": "Autoatendimento",
+      "description": "Manutenção",
+      "status": "finalizada",
+      "comentarios": [],
+      "autor": "admin",
+      "concluidoPor": "admin"
+    },
+    {
+      "id": "6b2a",
+      "createdAt": "2025-08-30T23:39:31.846Z",
+      "completedAt": null,
+      "title": "Teste",
+      "description": "TESTANDO AP",
+      "status": "pendente",
+      "comentarios": [],
+      "autor": "admin",
+      "assignedTo": "user"
+    }
+  ],
+  "users": [
+    {
+      "id": "1",
+      "username": "admin",
+      "password": "123",
+      "role": "admin"
+    },
+    {
+      "id": "2",
+      "username": "user",
+      "password": "123",
+      "role": "user"
+    }
+  ],
+  "projetos": [
+    {
+      "id": "99de",
+      "titulo": "Melhoria do sistema de presença dos alunos",
+      "descricao": "Construir e adaptar um sistema de reconhecimento facial para confirmar a presença dos alunos",
+      "autor": "admin",
+      "likes": 1,
+      "comentarios": [],
+      "likedBy": [
+        "admin"
+      ]
+    }
+  ]
+}

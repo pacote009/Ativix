@@ -1,0 +1,29 @@
+# ===========================================
+# GLOBAL
+# ===========================================
+.env
+.env.*
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+
+# ===========================================
+# BACKEND (os-backend)
+# ===========================================
+os-backend/node_modules/
+os-backend/dist/
+os-backend/build/
+os-backend/prisma/dev.db
+os-backend/.env
+os-backend/.env.*
+
+# ===========================================
+# FRONTEND (os-main)
+# ===========================================
+os-main/node_modules/
+os-main/dist/
+os-main/build/
+os-main/.env
+os-main/.env.*
