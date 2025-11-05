@@ -8,7 +8,7 @@ import Admin from "./pages/Admin";
 import CadastroUsuario from "./pages/CadastroUsuario";
 import Relatorios from "./pages/Relatorios";
 import ProtectedRoute from "./ProtectedRoute";
-import UserDashboard from "./pages/UserDashboard";
+import UserDashboard from "./pages/UserDashBoard";
 import UserLayout from "./pages/UserLayout"; 
 
 export default function App() {
