@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import AtividadeCard from "../components/AtividadeCard";
+import AtividadeCard from "../components/Atividadecard";
 import { addAtividade, getAtividades } from "../services/api";
 import { FaPlus, FaFilter } from "react-icons/fa";
 import { getCurrentUser } from "../auth";
