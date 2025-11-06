@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import ProjetoCard from "../components/ProjetoCard";
+import ProjetoCard from "../components/Projetocard";
 import { FaLightbulb } from "react-icons/fa";
 import api from "../services/api";
 import { getCurrentUser } from "../auth";
