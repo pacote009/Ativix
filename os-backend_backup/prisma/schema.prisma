@@ -1,0 +1,65 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  username  String    @unique
+  email     String?   @unique
+  password  String
+  role      Role      @default(USER)
+  createdAt DateTime  @default(now())
+
+  // relations
+  assignedAtividades Atividade[] @relation("UserAssigned")
+  projetosAutor Projeto[] @relation("ProjetoAutor")
+  orders Order[]
+}
+
+model Atividade {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  status      String    @default("pendente")
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  comentarios Json      @default(dbgenerated("'[]'"))
+  assignedTo   User?    @relation("UserAssigned", fields: [assignedToId], references: [id])
+  assignedToId Int?
+  concluidoPor String?  // <<< novo campo
+}
+
+
+model Projeto {
+  id         Int      @id @default(autoincrement())
+  titulo     String
+  descricao  String?
+  likes      Int      @default(0)
+  comentarios Json @default(dbgenerated("'[]'"))
+  likedBy     Json @default(dbgenerated("'[]'"))
+  createdAt  DateTime @default(now())
+
+  autor   User? @relation("ProjetoAutor", fields: [autorId], references: [id])
+  autorId Int?
+}
+
+model Order {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+
+  createdBy   User? @relation(fields: [createdById], references: [id])
+  createdById Int?
+}
