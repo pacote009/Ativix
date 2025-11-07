@@ -1,3 +1,4 @@
+// src/components/Atividadecard.jsx
 import { useState } from "react";
 import {
   updateAtividade,
@@ -10,25 +11,78 @@ import ModalAlterarUsuario from "./ModalAlterarUsuario";
 import { FaTrash, FaEdit, FaCheck, FaUserEdit, FaThumbtack } from "react-icons/fa";
 import { motion } from "framer-motion";
 
-const AtividadeCard = ({ atividade, onUpdate, onFixar }) => {
+const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpdate }) => {
   const user = getCurrentUser() || { username: "Desconhecido", role: "user" };
   const [showAlterarModal, setShowAlterarModal] = useState(false);
   const [comentario, setComentario] = useState("");
   const [editIndex, setEditIndex] = useState(null);
   const [editText, setEditText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const safeOnUpdate = async () => {
+    if (typeof onUpdate === "function") {
+      try {
+        await onUpdate();
+      } catch (err) {
+        console.error("Erro no onUpdate():", err);
+      }
+    }
+  };
 
   const handleConcluir = async () => {
-    await updateAtividade(atividade.id, {
+  if (loading) return;
+  setLoading(true);
+  try {
+    const resp = await updateAtividade(atividade.id, {
       status: "finalizada",
       concluidoPor: user.username,
     });
-    onUpdate();
-  };
+    console.log("updateAtividade resp:", resp);
+
+    if (typeof onConcluded === "function") {
+      try {
+        onConcluded(atividade.id);
+      } catch (err) {
+        console.error("Erro ao chamar onConcluded:", err);
+      }
+    }
+
+    // Revalida a lista no backend (mantém consistência)
+    await safeOnUpdate();
+
+    // FORÇA atualização global / remonta sections no pai
+    if (typeof onGlobalUpdate === "function") {
+      try {
+        console.log("Chamando onGlobalUpdate...");
+        onGlobalUpdate();
+      } catch (err) {
+        console.error("Erro ao chamar onGlobalUpdate:", err);
+      }
+    }
+
+  } catch (err) {
+    console.error("Erro ao concluir atividade:", err);
+    alert("Erro ao concluir a atividade. Veja o console para detalhes.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   const handleDelete = async () => {
-    if (window.confirm("Tem certeza que deseja excluir esta atividade?")) {
+    if (deleting) return;
+    if (!window.confirm("Tem certeza que deseja excluir esta atividade?")) return;
+    setDeleting(true);
+    try {
       await deleteAtividade(atividade.id);
-      onUpdate();
+      await safeOnUpdate();
+    } catch (err) {
+      console.error("Erro ao deletar:", err);
+      alert("Erro ao deletar atividade.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -38,22 +92,37 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar }) => {
       ...(atividade.comentarios || []),
       { autor: user.username, texto: comentario },
     ];
-    await updateAtividade(atividade.id, { comentarios: novosComentarios });
-    setComentario("");
-    onUpdate();
+    try {
+      await updateAtividade(atividade.id, { comentarios: novosComentarios });
+      setComentario("");
+      await safeOnUpdate();
+    } catch (err) {
+      console.error("Erro ao adicionar comentário:", err);
+      alert("Erro ao adicionar comentário.");
+    }
   };
 
   const handleDeleteComentario = async (index) => {
-    await deleteComentarioAtividade(atividade.id, index);
-    onUpdate();
+    try {
+      await deleteComentarioAtividade(atividade.id, index);
+      await safeOnUpdate();
+    } catch (err) {
+      console.error("Erro ao deletar comentário:", err);
+      alert("Erro ao deletar comentário.");
+    }
   };
 
   const handleUpdateComentario = async (index) => {
     if (editText.trim() === "") return;
-    await updateComentarioAtividadeTexto(atividade.id, index, editText);
-    setEditIndex(null);
-    setEditText("");
-    onUpdate();
+    try {
+      await updateComentarioAtividadeTexto(atividade.id, index, editText);
+      setEditIndex(null);
+      setEditText("");
+      await safeOnUpdate();
+    } catch (err) {
+      console.error("Erro ao atualizar comentário:", err);
+      alert("Erro ao atualizar comentário.");
+    }
   };
 
   return (
@@ -86,21 +155,22 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar }) => {
         {atividade.status === "pendente" && (
           <button
             onClick={handleConcluir}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition"
+            disabled={loading}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${loading ? "bg-gray-400 text-white" : "bg-green-600 hover:bg-green-700 text-white"}`}
           >
-            <FaCheck /> Concluir
+            {loading ? "Concluindo..." : <><FaCheck /> Concluir</>}
           </button>
         )}
 
         {/* Botão Fixar — aparece apenas para admins */}
         {user.role?.toLowerCase() === "admin" && atividade.status === "pendente" && (
-  <button
-    onClick={onFixar}
-    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-  >
-    <FaThumbtack /> Fixar
-  </button>
-)}
+          <button
+            onClick={() => onFixar && onFixar(atividade)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+          >
+            <FaThumbtack /> Fixar
+          </button>
+        )}
 
         {user.role === "admin" && atividade.assignedTo && (
           <button
@@ -114,9 +184,10 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar }) => {
         {user.role === "admin" && (
           <button
             onClick={handleDelete}
+            disabled={deleting}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
           >
-            <FaTrash /> Excluir
+            {deleting ? "..." : <><FaTrash /> Excluir</>}
           </button>
         )}
       </div>

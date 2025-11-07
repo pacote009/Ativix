@@ -243,12 +243,13 @@ export const getRelatorioConcluidasPorUsuario = async () => {
   const atividades = res.data.filter((a) => a.status === "finalizada");
   const porUsuario = {};
   atividades.forEach((a) => {
-    const user = a.assignedTo || "Não atribuído";
+    const user = a.assignedTo || a.concluidoPor || "Não atribuído";
     if (!porUsuario[user]) porUsuario[user] = [];
     porUsuario[user].push(a);
   });
   return porUsuario;
 };
+
 
 // Concluídas por dia
 export const getRelatorioConcluidasPorDia = async () => {
@@ -256,7 +257,7 @@ export const getRelatorioConcluidasPorDia = async () => {
   const atividades = res.data.filter((a) => a.status === "finalizada");
   const porDia = {};
   atividades.forEach((a) => {
-    const user = a.assignedTo || "Não atribuído";
+    const user = a.assignedTo || a.concluidoPor || "Não atribuído";
     const dia = new Date(a.createdAt).toLocaleDateString("pt-BR");
     if (!porDia[user]) porDia[user] = {};
     if (!porDia[user][dia]) porDia[user][dia] = [];
@@ -264,6 +265,7 @@ export const getRelatorioConcluidasPorDia = async () => {
   });
   return porDia;
 };
+
 
 // Concluídas por semana
 // Todas por semana (sem filtrar antes)
@@ -273,7 +275,7 @@ export const getRelatorioConcluidasPorSemana = async () => {
 
   const porSemana = {};
   atividades.forEach((a) => {
-    const user = a.assignedTo || "Não atribuído";
+    const user = a.assignedTo || a.concluidoPor || "Não atribuído";
     const d = new Date(a.createdAt);
 
 // 🔹 Encontrar a segunda-feira da semana

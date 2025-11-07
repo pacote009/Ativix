@@ -108,6 +108,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   const data = { ...req.body };
 
+  // Se for trocar assignedTo (frontend envia username), converte para assignedToId
   if (data.assignedTo) {
     const user = await prisma.user.findUnique({ where: { username: data.assignedTo }});
     if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -115,16 +116,30 @@ router.patch('/:id', authMiddleware, async (req, res) => {
     delete data.assignedTo;
   }
 
-  if (data.status && data.status.toLowerCase() === 'finalizada') {
+  // Se estiver finalizando, grava completedAt e concluidoPor automaticamente com o usuário autenticado
+  if (data.status && String(data.status).toLowerCase() === 'finalizada') {
     data.completedAt = new Date();
-    if (req.body.concluidoPor) {
-      data.concluidoPor = req.body.concluidoPor;
+
+    // Se o frontend enviar explicitamente concluidoPor, respeita (mantém compatibilidade),
+    // caso contrário, usa o usuário autenticado disponí­vel em req.user
+    if (!data.concluidoPor) {
+      if (req.user && req.user.username) {
+        data.concluidoPor = req.user.username;
+      } else if (req.user && req.user.id) {
+        // fallback: se você preferir salvar id, ajuste conforme seu schema
+        data.concluidoPor = String(req.user.id);
+      }
     }
   }
 
-  const updated = await prisma.atividade.update({ where: { id }, data });
-  const full = await prisma.atividade.findUnique({ where: { id }, include: { assignedTo: true }});
-  res.json({ ...full, assignedTo: full.assignedTo ? full.assignedTo.username : null });
+  try {
+    const updated = await prisma.atividade.update({ where: { id }, data });
+    const full = await prisma.atividade.findUnique({ where: { id }, include: { assignedTo: true }});
+    res.json({ ...full, assignedTo: full.assignedTo ? full.assignedTo.username : null });
+  } catch (err) {
+    console.error('Erro ao atualizar atividade:', err);
+    res.status(500).json({ error: 'Erro ao atualizar atividade', details: err.message });
+  }
 });
 
 

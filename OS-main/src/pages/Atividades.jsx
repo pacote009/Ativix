@@ -114,13 +114,13 @@ const Atividades = () => {
       )}
 
       {/* Seções */}
-      <Section key={`pendentes-${reload}`} title="Pendentes" status="pendente" reload={reload} setModalFixarAtividade={setModalFixarAtividade} />
-      <Section key={`finalizadas-${reload}`} title="Finalizadas" status="finalizada" reload={reload} setModalFixarAtividade={setModalFixarAtividade} />
+      <Section key={`pendentes-${reload}`} title="Pendentes" status="pendente" reload={reload} setModalFixarAtividade={setModalFixarAtividade} onGlobalUpdate={() => setReload((prev) => !prev)} />
+      <Section key={`finalizadas-${reload}`} title="Finalizadas" status="finalizada" reload={reload} setModalFixarAtividade={setModalFixarAtividade} onGlobalUpdate={() => setReload((prev) => !prev)} />
     </div>
   );
 };
 
-const Section = ({ title, status, reload, setModalFixarAtividade }) => {
+const Section = ({ title, status, reload, setModalFixarAtividade, onGlobalUpdate }) => {
   const user = getCurrentUser();
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("desc");
@@ -197,6 +197,11 @@ const Section = ({ title, status, reload, setModalFixarAtividade }) => {
                 atividade={atividade}
                 onUpdate={fetchData}
                 onFixar={() => setModalFixarAtividade(atividade)}
+                // nova prop: remove localmente a atividade concluída
+                onConcluded={(id) => {
+                  console.log('onConcluded chamado em Section para id', id);
+                  setData((prev) => prev.filter((a) => a.id !== id))}}
+                 onGlobalUpdate={onGlobalUpdate}
               />
             ))}
           </div>
