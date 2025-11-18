@@ -13,18 +13,18 @@ enum Role {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   name      String
-  username  String    @unique
-  email     String?   @unique
+  username  String   @unique
+  email     String?  @unique
   password  String
-  role      Role      @default(USER)
-  createdAt DateTime  @default(now())
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
 
   // relations
   assignedAtividades Atividade[] @relation("UserAssigned")
-  projetosAutor Projeto[] @relation("ProjetoAutor")
-  orders Order[]
+  projetosAutor      Projeto[]   @relation("ProjetoAutor")
+  orders             Order[]
 }
 
 model Atividade {
@@ -35,20 +35,21 @@ model Atividade {
   createdAt   DateTime  @default(now())
   completedAt DateTime?
   comentarios Json      @default(dbgenerated("'[]'"))
+  autor       String?               // <-- novo campo string com username do autor
   assignedTo   User?    @relation("UserAssigned", fields: [assignedToId], references: [id])
   assignedToId Int?
-  concluidoPor String?  // <<< novo campo
+  concluidoPor String?
 }
 
 
 model Projeto {
-  id         Int      @id @default(autoincrement())
-  titulo     String
-  descricao  String?
-  likes      Int      @default(0)
-  comentarios Json @default(dbgenerated("'[]'"))
-  likedBy     Json @default(dbgenerated("'[]'"))
-  createdAt  DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  titulo      String
+  descricao   String?
+  likes       Int      @default(0)
+  comentarios Json     @default(dbgenerated("'[]'"))
+  likedBy     Json     @default(dbgenerated("'[]'"))
+  createdAt   DateTime @default(now())
 
   autor   User? @relation("ProjetoAutor", fields: [autorId], references: [id])
   autorId Int?
