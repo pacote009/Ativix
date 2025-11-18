@@ -5,21 +5,285 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const api = axios.create({
   baseURL: BASE_URL,
-  // tempo de espera opcional (evita requests travados)
   timeout: 15000,
 });
 
-// pegar token do localStorage e enviar no header
+// Inserir token automaticamente
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
+    config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
 /**
- * Dashboard (dinâmico com projetos e atividades por usuário)
+ * getAtividades: chama a API /atividades com params e retorna { data, total }
+ * Compatível com backend que retorna array ou { data, total }.
+ *
+ * Params:
+ *  - status: string
+ *  - page, limit, order, search
+ *  - currentUser: objeto user (opcional) para filtro de assignedTo no frontend (compat)
+ *  - dateStart, dateEnd: strings 'YYYY-MM-DD' opcionais
+ */
+export const getAtividades = async (
+  status,
+  page = 1,
+  limit = 5,
+  order = "desc",
+  search = "",
+  currentUser = null,
+  dateStart = null,
+  dateEnd = null
+) => {
+  const params = { status, page, limit, order, search };
+  if (dateStart) params.dateStart = dateStart;
+  if (dateEnd) params.dateEnd = dateEnd;
+
+  try {
+    const res = await api.get("/atividades", { params });
+
+    // Compatibilidade: backend novo retorna { data, total }, mas pode retornar array
+    let list = [];
+    let total = 0;
+    if (res.data && Array.isArray(res.data)) {
+      list = res.data;
+      total = list.length;
+    } else if (res.data && Array.isArray(res.data.data)) {
+      list = res.data.data;
+      total = typeof res.data.total === "number" ? res.data.total : list.length;
+    } else {
+      // fallback defensivo
+      list = Array.isArray(res.data) ? res.data : [];
+      total = list.length;
+    }
+
+    console.log("getAtividades - dados recebidos:", { params, totalReturned: list.length, total });
+
+    // Filtro visibility: se currentUser não for admin, só mostra itens não-atribuídos ou atribuído ao próprio usuário
+    if (currentUser && String(currentUser.role).toLowerCase() !== "admin") {
+      const before = list.length;
+      list = list.filter((item) => !item.assignedTo || item.assignedTo === currentUser.username);
+      console.log("getAtividades - após filtro assignedTo:", { before, after: list.length });
+    }
+
+    // Se backend já paginou e retornou subset, não re-paginar.
+    // Aqui assumimos que `list` já contém apenas os itens da página quando backend paginou.
+    // Para compatibilidade com backend sem paginação, aplicamos paginação local apenas se o total === list.length.
+    let data = list;
+    if (total === list.length) {
+      // backend retornou todos os itens (ou não retornou total). Faz paginação local
+      const start = (page - 1) * limit;
+      const end = start + limit;
+      data = list.slice(start, end);
+    }
+
+    console.log("getAtividades - retorno final", { page, limit, dataLength: data.length, total });
+
+    return { data, total };
+  } catch (error) {
+    console.error("Erro na getAtividades:", error);
+    return { data: [], total: 0 };
+  }
+};
+
+/**
+ * addAtividade
+ */
+export const addAtividade = async (atividade) => {
+  const payload = {
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    ...atividade,
+  };
+  const res = await api.post("/atividades", payload);
+  return res.data;
+};
+
+/**
+ * updateAtividade
+ */
+export const updateAtividade = async (id, data) => {
+  if (data.status === "finalizada") {
+    data.completedAt = new Date().toISOString();
+  }
+  const response = await api.patch(`/atividades/${id}`, data);
+  return response.data;
+};
+
+/**
+ * Comentários / assign / delete / users
+ */
+export const addComentarioAtividade = async (id, comentario) => {
+  const atividade = await api.get(`/atividades/${id}`);
+  const novosComentarios = [...(atividade.data.comentarios || []), comentario];
+  const response = await api.patch(`/atividades/${id}`, { comentarios: novosComentarios });
+  return response.data;
+};
+
+export const assignAtividade = async (id, username) => {
+  const response = await api.patch(`/atividades/${id}`, { assignedTo: username });
+  return response.data;
+};
+
+export const getUsers = async () => {
+  const response = await api.get("/users");
+  return response.data;
+};
+
+export const deleteAtividade = async (id) => {
+  const response = await api.delete(`/atividades/${id}`);
+  return response.data;
+};
+
+export const deleteComentarioAtividade = async (id, index) => {
+  const atividade = await api.get(`/atividades/${id}`);
+  const comentarios = [...(atividade.data.comentarios || [])];
+  comentarios.splice(index, 1);
+  const response = await api.patch(`/atividades/${id}`, { comentarios });
+  return response.data;
+};
+
+export const updateComentarioAtividadeTexto = async (id, index, novoTexto) => {
+  const atividade = await api.get(`/atividades/${id}`);
+  const comentarios = [...(atividade.data.comentarios || [])];
+  if (comentarios[index]) comentarios[index].texto = novoTexto;
+  const response = await api.patch(`/atividades/${id}`, { comentarios });
+  return response.data;
+};
+
+/**
+ * Relatórios:
+ * - primeiro tenta endpoints específicos (/relatorios/...)
+ * - se falhar (404, 500 ou não implementado), faz fallback pegando /atividades?status=finalizada
+ *   e agrupa no frontend aplicando filtro por dateStart/dateEnd (usando completedAt).
+ */
+
+// HELPERS de filtro por data (inclusive fim do dia)
+function inRangeCompletedAt(item, dateStart, dateEnd) {
+  if (!dateStart && !dateEnd) return true;
+  const dt = item.completedAt ? new Date(item.completedAt) : (item.createdAt ? new Date(item.createdAt) : null);
+  if (!dt) return true;
+  if (dateStart) {
+    const s = new Date(dateStart);
+    if (dt < s) return false;
+  }
+  if (dateEnd) {
+    const e = new Date(dateEnd);
+    e.setHours(23, 59, 59, 999);
+    if (dt > e) return false;
+  }
+  return true;
+}
+
+// Concluídas por usuário (dateStart/dateEnd opcionais)
+export const getRelatorioConcluidasPorUsuario = async (dateStart = null, dateEnd = null) => {
+  try {
+    const res = await api.get("/relatorios/concluidas-por-usuario", { params: { dateStart, dateEnd } });
+    return res.data;
+  } catch (err) {
+    console.warn("Endpoint /relatorios/concluidas-por-usuario falhou — fallback para /atividades", err?.message);
+    // fallback: pegar atividades finalizadas e agrupar por assignedTo/concluidoPor
+    const resp = await api.get("/atividades", { params: { status: "finalizada", limit: 1000 } });
+    const all = Array.isArray(resp.data) ? resp.data : (resp.data?.data || []);
+    const filtered = all.filter((a) => inRangeCompletedAt(a, dateStart, dateEnd));
+    const porUsuario = {};
+    filtered.forEach((a) => {
+      const user = a.assignedTo || a.concluidoPor || "Não atribuído";
+      if (!porUsuario[user]) porUsuario[user] = [];
+      porUsuario[user].push(a);
+    });
+    return porUsuario;
+  }
+};
+
+// Concluídas por dia
+export const getRelatorioConcluidasPorDia = async (dateStart = null, dateEnd = null) => {
+  try {
+    const res = await api.get("/relatorios/concluidas-por-dia", { params: { dateStart, dateEnd } });
+    return res.data;
+  } catch (err) {
+    console.warn("Endpoint /relatorios/concluidas-por-dia falhou — fallback para /atividades", err?.message);
+    const resp = await api.get("/atividades", { params: { status: "finalizada", limit: 1000 } });
+    const all = Array.isArray(resp.data) ? resp.data : (resp.data?.data || []);
+    const filtered = all.filter((a) => inRangeCompletedAt(a, dateStart, dateEnd));
+    const porDia = {};
+    filtered.forEach((a) => {
+      const user = a.assignedTo || a.concluidoPor || "Não atribuído";
+      const dia = new Date(a.completedAt || a.createdAt).toLocaleDateString("pt-BR");
+      if (!porDia[user]) porDia[user] = {};
+      if (!porDia[user][dia]) porDia[user][dia] = [];
+      porDia[user][dia].push(a);
+    });
+    return porDia;
+  }
+};
+
+// Concluídas por semana
+export const getRelatorioConcluidasPorSemana = async (dateStart = null, dateEnd = null) => {
+  try {
+    const res = await api.get("/relatorios/concluidas-por-semana", { params: { dateStart, dateEnd } });
+    return res.data;
+  } catch (err) {
+    console.warn("Endpoint /relatorios/concluidas-por-semana falhou — fallback para /atividades", err?.message);
+    const resp = await api.get("/atividades", { params: { status: "finalizada", limit: 1000 } });
+    const all = Array.isArray(resp.data) ? resp.data : (resp.data?.data || []);
+    const filtered = all.filter((a) => inRangeCompletedAt(a, dateStart, dateEnd));
+    const porSemana = {};
+    filtered.forEach((a) => {
+      const user = a.assignedTo || a.concluidoPor || "Não atribuído";
+      const d = new Date(a.completedAt || a.createdAt);
+
+      // Ajuste para obter segunda-feira da semana (considerando domingo como último)
+      const primeiroDiaSemana = new Date(d);
+      const day = primeiroDiaSemana.getDay();
+      const diffToMonday = (day === 0) ? -6 : (1 - day); // se domingo (0) volta para segunda anterior
+      primeiroDiaSemana.setDate(firstDaySafe(primeiroDiaSemana).getDate() + diffToMonday);
+
+      const ultimoDiaSemana = new Date(primeiroDiaSemana);
+      ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6);
+
+      const formatar = (data) => data.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      const semana = `${formatar(primeiroDiaSemana)} - ${formatar(ultimoDiaSemana)}`;
+
+      if (!porSemana[user]) porSemana[user] = {};
+      if (!porSemana[user][semana]) porSemana[user][semana] = [];
+      porSemana[user][semana].push(a);
+    });
+    return porSemana;
+  }
+};
+
+// Helper seguro para ajustar sem modificar objetos originais
+function firstDaySafe(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Fixadas por usuário
+export const getRelatorioFixadasPorUsuario = async (dateStart = null, dateEnd = null) => {
+  try {
+    const res = await api.get("/relatorios/fixadas-por-usuario", { params: { dateStart, dateEnd } });
+    return res.data;
+  } catch (err) {
+    console.warn("Endpoint /relatorios/fixadas-por-usuario falhou — fallback para /atividades", err?.message);
+    const resp = await api.get("/atividades", { params: { limit: 1000 } });
+    const all = Array.isArray(resp.data) ? resp.data : (resp.data?.data || []);
+    const filtered = all.filter((a) => a.assignedTo && inRangeCompletedAt(a, dateStart, dateEnd));
+    const fixadas = {};
+    filtered.forEach((a) => {
+      const user = a.assignedTo;
+      if (!fixadas[user]) fixadas[user] = [];
+      fixadas[user].push(a);
+    });
+    return fixadas;
+  }
+};
+
+/**
+ * getDashboard (mantive sua implementação de chamar /atividades etc)
+ * você pode migrar para um endpoint no backend que já traga tudo agregadinho.
  */
 export const getDashboardData = async () => {
   try {
@@ -29,45 +293,29 @@ export const getDashboardData = async () => {
       api.get("/users"),
     ]);
 
-    const atividades = Array.isArray(atividadesRes.data) ? atividadesRes.data : [];
-    const projetos = Array.isArray(projetosRes.data) ? projetosRes.data : [];
-    const users = Array.isArray(usersRes.data) ? usersRes.data : [];
+    const atividades = Array.isArray(atividadesRes.data) ? atividadesRes.data : (atividadesRes.data?.data || []);
+    const projetos = Array.isArray(projetosRes.data) ? projetosRes.data : (projetosRes.data?.data || []);
+    const users = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.data || []);
 
-    // Contagem de atividades por status
-    const concluidas = atividades.filter(
-  (a) => ["finalizada", "concluida", "concluído"].includes(String(a.status).toLowerCase())
-).length;
-
-const pendentes = atividades.filter(
-  (a) => ["pendente"].includes(String(a.status).toLowerCase())
-).length;
-
-
-    // Contagem total de projetos
+    const concluidas = atividades.filter((a) => ["finalizada", "concluida", "concluído"].includes(String(a.status).toLowerCase())).length;
+    const pendentes = atividades.filter((a) => ["pendente"].includes(String(a.status).toLowerCase())).length;
     const totalProjetos = projetos.length;
 
-    // Projetos por usuário (com base no campo "autor")
     const projetosPorUsuario = {};
     projetos.forEach((p) => {
       const autor = p.autor || "Desconhecido";
       projetosPorUsuario[autor] = (projetosPorUsuario[autor] || 0) + 1;
     });
 
-    // Atividades por usuário (com base no campo "assignedTo")
     const atividadesPorUsuario = {};
     atividades.forEach((a) => {
-      const user = a.assignedTo || "Não atribuído";
-      atividadesPorUsuario[user] = (atividadesPorUsuario[user] || 0) + 1;
+      const u = a.assignedTo || "Não atribuído";
+      atividadesPorUsuario[u] = (atividadesPorUsuario[u] || 0) + 1;
     });
 
-    // Garantir que todos os usuários apareçam no gráfico, mesmo com zero
     users.forEach((u) => {
-      if (!(u.username in projetosPorUsuario)) {
-        projetosPorUsuario[u.username] = 0;
-      }
-      if (!(u.username in atividadesPorUsuario)) {
-        atividadesPorUsuario[u.username] = 0;
-      }
+      if (!(u.username in projetosPorUsuario)) projetosPorUsuario[u.username] = 0;
+      if (!(u.username in atividadesPorUsuario)) atividadesPorUsuario[u.username] = 0;
     });
 
     return {
@@ -87,232 +335,6 @@ const pendentes = atividades.filter(
       atividadesPorUsuario: {},
     };
   }
-};
-
-
-export const loginUser = async (username, password) => {
-  const response = await api.get(`/users?username=${username}&password=${password}`);
-  if (response.data.length > 0) {
-    const user = response.data[0];
-
-    // SALVAR TOKEN
-    localStorage.setItem("token", user.token || "fake-token"); // se tiver token do backend, use ele
-    localStorage.setItem("user", JSON.stringify(user));
-
-    return user;
-  } else {
-    throw new Error("Usuário ou senha inválidos!");
-  }
-};
-
-/**
- * Buscar atividades com paginação, ordenação, filtro e ocultar fixadas para outros usuários
- */
-export const getAtividades = async (
-  status,
-  page = 1,
-  limit = 5,
-  order = "desc",
-  search = "",
-  currentUser  = null  // ✅ Removido espaço extra
-) => {
-  // ✅ Envia status, order e search para o backend (backend processa where.OR para search e orderBy para order)
-  const params = { status, order, search };
-
-  try {
-    const res = await api.get("/atividades", { params }); // ✅ Envia TODOS os params (status, order, search)
-
-    let list = Array.isArray(res.data) ? res.data : [];
-
-    // ✅ LOG PARA DEBUG: Ver o que o backend retornou (antes do filtro local)
-    console.log('Dados recebidos do backend (após search no banco):', { status, search, totalFromBackend: list.length, items: list.map(item => ({ title: item.title, description: item.description })) });
-
-    // 🔒 Filtro por assignedTo (fixadas/visibilidade): mantém no frontend (depende de currentUser )
-    if (currentUser  && currentUser .role !== "admin") {  // ✅ Removido espaço extra em .role
-      const beforeFilter = list.length;  // Definido aqui, dentro do if
-      list = list.filter((item) => !item.assignedTo || item.assignedTo === currentUser .username);  // ✅ Removido espaço extra em .username
-      // ✅ LOG PARA DEBUG: Ver se o filtro assignedTo remove itens (só executa se if for true)
-      console.log('Após filtro assignedTo (para usuário não-admin):', { before: beforeFilter, after: list.length });
-    }
-
-    // REMOVIDO: Filtro de search local (backend já faz com where.OR)
-    // REMOVIDO: Ordenação local (backend já faz com orderBy por createdAt)
-
-    // 📄 Paginação: ainda no frontend (backend não suporta ainda; implemente se quiser eficiência)
-    const total = list.length;
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const data = list.slice(start, end);
-
-    // ✅ LOG PARA DEBUG: Ver após paginação
-    console.log('Após paginação (page:', page, 'limit:', limit, '):', { total, dataLength: data.length });
-
-    return { data, total };
-  } catch (error) {
-    console.error('Erro na getAtividades:', error);  // ✅ Try-catch para capturar erros (ex.: 500 do backend)
-    return { data: [], total: 0 };  // Retorna vazio em caso de erro, para não quebrar o app
-  }
-};
-/**
- * Adicionar nova atividade
- */
-export const addAtividade = async (atividade) => {
-  const payload = {
-    createdAt: new Date().toISOString(),  // data de criação ISO
-    completedAt: null,                    // só preenche ao finalizar
-    ...atividade,
-  };
-  const res = await api.post("/atividades", payload);
-  return res.data;
-};
-
-/**
- * Atualizar atividade
- */
-export const updateAtividade = async (id, data) => {
-  // se está sendo marcada como finalizada, salva a hora da conclusão
-  if (data.status === "finalizada") {
-    data.completedAt = new Date().toISOString();
-  }
-
-  const response = await api.patch(`/atividades/${id}`, data);
-  return response.data;
-};
-
-/**
- * Adicionar comentário em atividade
- */
-export const addComentarioAtividade = async (id, comentario) => {
-  const atividade = await api.get(`/atividades/${id}`);
-  const novosComentarios = [...atividade.data.comentarios, comentario];
-  const response = await api.patch(`/atividades/${id}`, { comentarios: novosComentarios });
-  return response.data;
-};
-
-/**
- * Atribuir atividade a um usuário (fixar)
- */
-export const assignAtividade = async (id, username) => {
-  const response = await api.patch(`/atividades/${id}`, { assignedTo: username });
-  return response.data;
-};
-
-/**
- * Buscar todos os usuários
- */
-export const getUsers = async () => {
-  const response = await api.get("/users");
-  return response.data;
-};
-
-/**
- * Excluir atividade
- */
-export const deleteAtividade = async (id) => {
-  const response = await api.delete(`/atividades/${id}`);
-  return response.data;
-};
-
-/**
- * Excluir comentário em atividade
- */
-export const deleteComentarioAtividade = async (id, index) => {
-  const atividade = await api.get(`/atividades/${id}`);
-  const comentarios = [...atividade.data.comentarios];
-  comentarios.splice(index, 1);
-  const response = await api.patch(`/atividades/${id}`, { comentarios });
-  return response.data;
-};
-
-/**
- * Atualizar comentário em atividade
- */
-export const updateComentarioAtividadeTexto = async (id, index, novoTexto) => {
-  const atividade = await api.get(`/atividades/${id}`);
-  const comentarios = [...atividade.data.comentarios];
-  if (comentarios[index]) {
-    comentarios[index].texto = novoTexto;
-  }
-  const response = await api.patch(`/atividades/${id}`, { comentarios });
-  return response.data;
-};
-
-// Concluídas por usuário
-export const getRelatorioConcluidasPorUsuario = async () => {
-  const res = await api.get("/atividades");
-  const atividades = res.data.filter((a) => a.status === "finalizada");
-  const porUsuario = {};
-  atividades.forEach((a) => {
-    const user = a.assignedTo || a.concluidoPor || "Não atribuído";
-    if (!porUsuario[user]) porUsuario[user] = [];
-    porUsuario[user].push(a);
-  });
-  return porUsuario;
-};
-
-
-// Concluídas por dia
-export const getRelatorioConcluidasPorDia = async () => {
-  const res = await api.get("/atividades");
-  const atividades = res.data.filter((a) => a.status === "finalizada");
-  const porDia = {};
-  atividades.forEach((a) => {
-    const user = a.assignedTo || a.concluidoPor || "Não atribuído";
-    const dia = new Date(a.createdAt).toLocaleDateString("pt-BR");
-    if (!porDia[user]) porDia[user] = {};
-    if (!porDia[user][dia]) porDia[user][dia] = [];
-    porDia[user][dia].push(a);
-  });
-  return porDia;
-};
-
-
-// Concluídas por semana
-// Todas por semana (sem filtrar antes)
-export const getRelatorioConcluidasPorSemana = async () => {
-  const res = await api.get("/atividades");
-  const atividades = res.data; // ✅ pega todas
-
-  const porSemana = {};
-  atividades.forEach((a) => {
-    const user = a.assignedTo || a.concluidoPor || "Não atribuído";
-    const d = new Date(a.createdAt);
-
-// 🔹 Encontrar a segunda-feira da semana
-const primeiroDiaSemana = new Date(d);
-primeiroDiaSemana.setDate(d.getDate() - d.getDay() + 1); // segunda-feira
-
-// 🔹 Último dia da semana (domingo)
-const ultimoDiaSemana = new Date(primeiroDiaSemana);
-ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6);
-
-// 🔹 Formatar intervalo (21/08 - 27/08)
-const formatar = (data) =>
-  data.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-
-const semana = `${formatar(primeiroDiaSemana)} - ${formatar(ultimoDiaSemana)}`;
-
-if (!porSemana[user]) porSemana[user] = {};
-if (!porSemana[user][semana]) porSemana[user][semana] = [];
-porSemana[user][semana].push(a);
-
-  });
-
-  return porSemana;
-};
-
-
-// Fixadas por usuário
-export const getRelatorioFixadasPorUsuario = async () => {
-  const res = await api.get("/atividades");
-  const atividades = res.data.filter((a) => a.assignedTo);
-  const fixadas = {};
-  atividades.forEach((a) => {
-    const user = a.assignedTo;
-    if (!fixadas[user]) fixadas[user] = [];
-    fixadas[user].push(a);
-  });
-  return fixadas;
 };
 
 /**

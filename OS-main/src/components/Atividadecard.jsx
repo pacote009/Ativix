@@ -11,6 +11,10 @@ import ModalAlterarUsuario from "./ModalAlterarUsuario";
 import { FaTrash, FaEdit, FaCheck, FaUserEdit, FaThumbtack } from "react-icons/fa";
 import { motion } from "framer-motion";
 
+// logo no topo do arquivo, abaixo dos imports
+console.log("AtividadeCard: componente carregado", new Date().toISOString());
+
+
 const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpdate }) => {
   const user = getCurrentUser() || { username: "Desconhecido", role: "user" };
   const [showAlterarModal, setShowAlterarModal] = useState(false);
@@ -31,60 +35,62 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
   };
 
   const handleConcluir = async () => {
-  if (loading) return;
-  setLoading(true);
+    if (loading) return;
+    setLoading(true);
+    try {
+      const resp = await updateAtividade(atividade.id, {
+        status: "finalizada",
+        concluidoPor: user.username,
+      });
+      console.log("updateAtividade resp:", resp);
+
+      if (typeof onConcluded === "function") {
+        try {
+          onConcluded(atividade.id);
+        } catch (err) {
+          console.error("Erro ao chamar onConcluded:", err);
+        }
+      }
+
+      await safeOnUpdate();
+
+      if (typeof onGlobalUpdate === "function") {
+        try {
+          onGlobalUpdate();
+        } catch (err) {
+          console.error("Erro ao chamar onGlobalUpdate:", err);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao concluir atividade:", err);
+      alert("Erro ao concluir a atividade. Veja o console para detalhes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+  if (deleting) return;
+  if (!window.confirm("Tem certeza que deseja excluir esta atividade?")) return;
+  setDeleting(true);
   try {
-    const resp = await updateAtividade(atividade.id, {
-      status: "finalizada",
-      concluidoPor: user.username,
-    });
-    console.log("updateAtividade resp:", resp);
-
-    if (typeof onConcluded === "function") {
-      try {
-        onConcluded(atividade.id);
-      } catch (err) {
-        console.error("Erro ao chamar onConcluded:", err);
-      }
-    }
-
-    // Revalida a lista no backend (mantém consistência)
+    await deleteAtividade(atividade.id);
     await safeOnUpdate();
-
-    // FORÇA atualização global / remonta sections no pai
-    if (typeof onGlobalUpdate === "function") {
-      try {
-        console.log("Chamando onGlobalUpdate...");
-        onGlobalUpdate();
-      } catch (err) {
-        console.error("Erro ao chamar onGlobalUpdate:", err);
-      }
-    }
-
   } catch (err) {
-    console.error("Erro ao concluir atividade:", err);
-    alert("Erro ao concluir a atividade. Veja o console para detalhes.");
+    console.error("Erro ao deletar:", err);
+    const code = err?.response?.status;
+    if (code === 401) {
+      alert("Você precisa estar logado para excluir atividades.");
+    } else if (code === 403) {
+      alert("Apenas administradores podem excluir atividades.");
+    } else {
+      alert("Erro ao deletar atividade. Veja o console para detalhes.");
+    }
   } finally {
-    setLoading(false);
+    setDeleting(false);
   }
 };
 
-
-
-  const handleDelete = async () => {
-    if (deleting) return;
-    if (!window.confirm("Tem certeza que deseja excluir esta atividade?")) return;
-    setDeleting(true);
-    try {
-      await deleteAtividade(atividade.id);
-      await safeOnUpdate();
-    } catch (err) {
-      console.error("Erro ao deletar:", err);
-      alert("Erro ao deletar atividade.");
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const handleAddComentario = async () => {
     if (comentario.trim() === "") return;
@@ -125,17 +131,21 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
     }
   };
 
+  // controle de permissão para excluir: somente admin
+const canDelete = user.role && String(user.role).toLowerCase() === "admin";
+
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 flex flex-col justify-between hover:shadow-2xl transition-all"
+      transition={{ duration: 0.32 }}
+      className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 sm:p-6 flex flex-col justify-between hover:shadow-2xl transition-all"
     >
       {/* Cabeçalho */}
-      <div className="mb-4">
-        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">{atividade.title}</h3>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">{atividade.description}</p>
+      <div className="mb-3">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200">{atividade.title}</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{atividade.description}</p>
 
         {atividade.assignedTo && (
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
@@ -144,48 +154,64 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
         )}
 
         {atividade.status === "finalizada" && atividade.concluidoPor && (
-          <p className="text-green-600 dark:text-green-400 mt-2 text-sm">
+          <p className="text-sm text-green-600 dark:text-green-400 mt-2">
             ✅ Concluído por: <strong>{atividade.concluidoPor}</strong>
           </p>
         )}
       </div>
 
-      {/* Botões */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      {/* Botões: responsivo (empilha no mobile) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:flex-wrap gap-2 mb-3">
+        {/* Concluir */}
         {atividade.status === "pendente" && (
           <button
             onClick={handleConcluir}
             disabled={loading}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${loading ? "bg-gray-400 text-white" : "bg-green-600 hover:bg-green-700 text-white"}`}
+            className={`w-full sm:w-auto flex-0 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition ${
+              loading ? "bg-gray-400 text-white" : "bg-green-600 hover:bg-green-700 text-white"
+            }`}
           >
             {loading ? "Concluindo..." : <><FaCheck /> Concluir</>}
           </button>
         )}
 
-        {/* Botão Fixar — aparece apenas para admins */}
+        {/* Fixar (apenas admin) */}
         {user.role?.toLowerCase() === "admin" && atividade.status === "pendente" && (
           <button
             onClick={() => onFixar && onFixar(atividade)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+            className="w-full sm:w-auto flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
           >
             <FaThumbtack /> Fixar
           </button>
         )}
 
+        {/* Alterar usuário (admin) */}
         {user.role === "admin" && atividade.assignedTo && (
           <button
             onClick={() => setShowAlterarModal(true)}
-            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition"
+            className="w-full sm:w-auto flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg"
           >
             <FaUserEdit /> Alterar Usuário
           </button>
         )}
 
-        {user.role === "admin" && (
+        {/* Novo: botão Excluir para atividades pendentes (admin ou autor) */}
+        {atividade.status === "pendente" && canDelete && (
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition"
+            className="w-full sm:w-auto flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+          >
+            {deleting ? "..." : <><FaTrash /> Excluir</>}
+          </button>
+        )}
+
+        {/* Caso seja admin e não encaixe nos outros, admin ainda tem opção excluir no fim */}
+        {user.role === "admin" && atividade.status !== "pendente" && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="w-full sm:w-auto flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
           >
             {deleting ? "..." : <><FaTrash /> Excluir</>}
           </button>
@@ -198,14 +224,14 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
       )}
 
       {/* Comentários */}
-      <div className="mt-6">
-        <h4 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Comentários:</h4>
+      <div className="mt-2">
+        <h4 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Comentários:</h4>
         <div className="space-y-3">
           {(atividade.comentarios && atividade.comentarios.length > 0) ? (
             atividade.comentarios.map((coment, index) => (
               <div
                 key={index}
-                className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 flex justify-between items-center shadow-sm"
+                className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm"
               >
                 {editIndex === index ? (
                   <div className="flex w-full gap-2">
@@ -217,16 +243,18 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
                     />
                     <button
                       onClick={() => handleUpdateComentario(index)}
-                      className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"
+                      className="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600"
                     >
                       Salvar
                     </button>
                   </div>
                 ) : (
                   <>
-                    <span className="text-gray-800 dark:text-gray-200">
-                      <strong>{coment.autor}:</strong> {coment.texto}
-                    </span>
+                    <div className="mb-2 sm:mb-0">
+                      <span className="text-gray-800 dark:text-gray-200">
+                        <strong>{coment.autor}:</strong> {coment.texto}
+                      </span>
+                    </div>
                     <div className="flex gap-3">
                       {coment.autor === user.username && (
                         <button
@@ -257,7 +285,7 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
           )}
         </div>
 
-        <div className="flex gap-3 mt-4">
+        <div className="flex gap-3 mt-3">
           <input
             type="text"
             placeholder="Adicionar comentário..."
@@ -267,7 +295,7 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
           />
           <button
             onClick={handleAddComentario}
-            className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             Adicionar
           </button>

@@ -17,11 +17,14 @@ const Relatorios = () => {
   const [activeTab, setActiveTab] = useState("usuarios");
   const [data, setData] = useState(null);
   const [isDark, setIsDark] = useState(false);
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
   const observerRef = useRef(null);
 
   useEffect(() => {
-    loadData(activeTab);
-  }, [activeTab]);
+    loadData(activeTab, dateStart, dateEnd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, dateStart, dateEnd]);
 
   // detecta se existe a classe 'dark' no root e observa mudanças (para atualizar o gráfico)
   useEffect(() => {
@@ -31,7 +34,6 @@ const Relatorios = () => {
     };
     detect();
 
-    // observa alterações de atributo class no <html> para atualizar isDark quando o usuário altera tema
     const target = document.documentElement;
     if (target) {
       const mo = new MutationObserver(() => detect());
@@ -43,12 +45,12 @@ const Relatorios = () => {
     };
   }, []);
 
-  const loadData = async (tab) => {
+  const loadData = async (tab, dateStartParam = null, dateEndParam = null) => {
     let result = {};
-    if (tab === "usuarios") result = await getRelatorioConcluidasPorUsuario();
-    if (tab === "dia") result = await getRelatorioConcluidasPorDia();
-    if (tab === "semana") result = await getRelatorioConcluidasPorSemana();
-    if (tab === "fixadas") result = await getRelatorioFixadasPorUsuario();
+    if (tab === "usuarios") result = await getRelatorioConcluidasPorUsuario(dateStartParam || null, dateEndParam || null);
+    if (tab === "dia") result = await getRelatorioConcluidasPorDia(dateStartParam || null, dateEndParam || null);
+    if (tab === "semana") result = await getRelatorioConcluidasPorSemana(dateStartParam || null, dateEndParam || null);
+    if (tab === "fixadas") result = await getRelatorioFixadasPorUsuario(dateStartParam || null, dateEndParam || null);
     setData(result);
   };
 
@@ -138,59 +140,67 @@ const Relatorios = () => {
     : [];
 
   // cores para Recharts de acordo com tema
-  const axisStroke = isDark ? "#d1d5db" : "#374151"; // eixo: claro no dark, escuro no light
-  const gridStroke = isDark ? "#2d3748" : "#e5e7eb"; // grid mais sutil no dark
+  const axisStroke = isDark ? "#d1d5db" : "#374151";
+  const gridStroke = isDark ? "#2d3748" : "#e5e7eb";
   const tooltipWrapperStyle = { backgroundColor: isDark ? "#111827" : "#fff", color: isDark ? "#f9fafb" : "#111827" };
+
+  // helper para classes dos botões de tab:
+  const tabClass = (tab) =>
+    `px-4 py-2 rounded focus:outline-none transition inline-flex items-center gap-2 ${
+      activeTab === tab
+        ? "bg-indigo-600 text-white dark:bg-indigo-500"
+        : "bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-100 ring-1 ring-gray-300 dark:ring-gray-700"
+    }`;
 
   return (
     <div className="min-h-[200px]">
       <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">Relatórios de Atividades</h1>
 
       {/* Tabs */}
-      <div className="flex gap-3 mb-6">
-        <button
-          onClick={() => setActiveTab("usuarios")}
-          className={`px-4 py-2 rounded focus:outline-none transition ${
-            activeTab === "usuarios"
-              ? "bg-indigo-600 text-white dark:bg-indigo-500"
-              : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-          }`}
-        >
+      <div className="flex gap-3 mb-4 flex-wrap">
+        <button onClick={() => setActiveTab("usuarios")} className={tabClass("usuarios")}>
           Concluídas por Usuário
         </button>
 
-        <button
-          onClick={() => setActiveTab("dia")}
-          className={`px-4 py-2 rounded focus:outline-none transition ${
-            activeTab === "dia"
-              ? "bg-indigo-600 text-white dark:bg-indigo-500"
-              : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-          }`}
-        >
+        <button onClick={() => setActiveTab("dia")} className={tabClass("dia")}>
           Concluídas por Dia
         </button>
 
-        <button
-          onClick={() => setActiveTab("semana")}
-          className={`px-4 py-2 rounded focus:outline-none transition ${
-            activeTab === "semana"
-              ? "bg-indigo-600 text-white dark:bg-indigo-500"
-              : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-          }`}
-        >
+        <button onClick={() => setActiveTab("semana")} className={tabClass("semana")}>
           Concluídas por Semana
         </button>
 
-        <button
-          onClick={() => setActiveTab("fixadas")}
-          className={`px-4 py-2 rounded focus:outline-none transition ${
-            activeTab === "fixadas"
-              ? "bg-indigo-600 text-white dark:bg-indigo-500"
-              : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-          }`}
-        >
+        <button onClick={() => setActiveTab("fixadas")} className={tabClass("fixadas")}>
           Fixadas por Usuário
         </button>
+      </div>
+
+      {/* Range de datas */}
+      <div className="flex gap-3 mb-4 items-end flex-wrap">
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 dark:text-gray-300">Data início</label>
+          <input
+            type="date"
+            value={dateStart}
+            onChange={(e) => setDateStart(e.target.value)}
+            className="border rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 dark:text-gray-300">Data fim</label>
+          <input
+            type="date"
+            value={dateEnd}
+            onChange={(e) => setDateEnd(e.target.value)}
+            className="border rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          />
+        </div>
+
+        <div className="ml-auto flex gap-2">
+          <button onClick={() => { setDateStart(""); setDateEnd(""); }} className="px-3 py-2 rounded bg-gray-300 dark:bg-gray-600">
+            Limpar
+          </button>
+        </div>
       </div>
 
       {/* Botões de Exportar */}
