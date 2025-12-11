@@ -15,8 +15,11 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // log temporário
+  //console.log('[API REQUEST]', config.method, config.url, config.data);
   return config;
 });
+
 
 /**
  * getAtividades: chama a API /atividades com params e retorna { data, total }
@@ -348,6 +351,56 @@ export const getDashboard = async () => {
     console.error("Erro ao buscar dashboard:", error);
     throw error;
   }
+};
+
+// GET /toners
+export const getToners = () => api.get('/toners').then(r => r.data);
+
+// POST /toners -> aceita payload com initialStock OR stock (compatibilidade)
+export const createToner = (payload) => {
+  // Garantia: se frontend enviar "stock", mapeamos para initialStock (compat)
+  const body = { ...payload };
+  if (body.stock !== undefined && body.initialStock === undefined) {
+    body.initialStock = Number(body.stock) || 0;
+    delete body.stock;
+  }
+  // normaliza minStock
+  if (body.minStock !== undefined) body.minStock = Number(body.minStock) || 0;
+  return api.post('/toners', body).then(r => r.data);
+};
+
+// PATCH /toners/:id
+export const updateToner = (id, payload) => api.patch(`/toners/${id}`, payload).then(r => r.data);
+
+// POST movement -> normaliza payload para garantir origin/destination/quantity/printerId corretos
+export const addTonerMovement = async (id, payload) => {
+  // payload: { type, quantity, note, destination, origin, printerId }
+  const body = {
+    type: payload.type,
+    quantity: Number(payload.quantity) || 0,
+    note: payload.note ?? null,
+    destination: payload.destination ?? null,
+    origin: payload.origin ?? null,
+    printerId: payload.printerId !== undefined && payload.printerId !== null ? Number(payload.printerId) : null,
+  };
+
+  const res = await api.post(`/toners/${id}/movements`, body);
+  return res.data;
+};
+
+// GET movements
+export const getTonerMovements = (id) => api.get(`/toners/${id}/movements`).then(r => r.data);
+
+// DELETE /toners/:id
+export const deleteToner = (id) => api.delete(`/toners/${id}`).then(r => r.data);
+
+// GET /toners/report/usage
+export const getTonerUsageReport = async (dateStart = null, dateEnd = null) => {
+  const params = {};
+  if (dateStart) params.dateStart = dateStart;
+  if (dateEnd) params.dateEnd = dateEnd;
+  const res = await api.get('/toners/report/usage', { params });
+  return res.data;
 };
 
 

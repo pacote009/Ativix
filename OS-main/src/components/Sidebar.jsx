@@ -10,6 +10,8 @@ import {
 import { getCurrentUser, logout } from "../auth";
 import { useEffect, useState } from "react";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/solid";
+import { FaTachometerAlt, FaClipboardList, FaGhost, FaBox } from "react-icons/fa"; // adapte ícones
+
 
 export default function Sidebar({ open = false, onClose = () => {} }) {
   const user = getCurrentUser();
@@ -121,6 +123,17 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
               <span>Atividades</span>
             </Link>
 
+            <Link
+  to={isAdmin ? "/admin/toners" : "/user/toners"}
+  onClick={() => onClose()}
+  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700 transition-all"
+
+>
+  <FaBox className="h-5 w-5" />
+  <span className="text-sm">Toners</span>
+</Link>
+
+
             {isAdmin && (
               <>
                 <Link
@@ -132,6 +145,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
                   <span>Cadastro Usuário</span>
                 </Link>
 
+              
                 <Link
                   to="/admin/relatorios"
                   onClick={() => onClose()}

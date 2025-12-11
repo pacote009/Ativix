@@ -10,65 +10,70 @@ import Relatorios from "./pages/Relatorios";
 import ProtectedRoute from "./ProtectedRoute";
 import UserDashboard from "./pages/UserDashBoard";
 import UserLayout from "./pages/UserLayout"; 
+import Toners from "./pages/Toners";
 
 export default function App() {
   return (
     <div className="min-h-screen w-full">
-      {/* Toaster global */}
       <Toaster position="top-right" reverseOrder={false} />
 
       <Routes>
-  {/* Login */}
-  <Route path="/" element={<Login />} />
+        {/* Login */}
+        <Route path="/" element={<Login />} />
 
-  {/* Rotas globais (user/admin) */}
-  <Route
-    path="/projetos"
-    element={
-      <ProtectedRoute>
-        <Projetos />
-      </ProtectedRoute>
-    }
-  />
-  <Route
-    path="/atividades"
-    element={
-      <ProtectedRoute>
-        <Atividades />
-      </ProtectedRoute>
-    }
-  />
+        {/* Rotas globais (user/admin) */}
+        <Route
+          path="/projetos"
+          element={
+            <ProtectedRoute>
+              <Projetos />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/atividades"
+          element={
+            <ProtectedRoute>
+              <Atividades />
+            </ProtectedRoute>
+          }
+        />
 
-  {/* Rotas do USUÁRIO COMUM */}
-  <Route
-    path="/user"
-    element={
-      <ProtectedRoute>
-        <UserLayout />
-      </ProtectedRoute>
-    }
-  >
-    <Route path="dashboard" element={<UserDashboard />} />
-    <Route path="projetos" element={<Projetos />} />
-    <Route path="atividades" element={<Atividades />} />
-  </Route>
+        {/* REMOVIDO: rota /toners solta (não deve existir!) */}
+        {/** ❌ <Route path="/toners" element={<ProtectedRoute><Toners /></ProtectedRoute>} /> */}
 
-  {/* Rotas do ADMIN */}
-  <Route
-    path="/admin"
-    element={
-      <ProtectedRoute adminOnly>
-        <Admin />
-      </ProtectedRoute>
-    }
-  >
-    <Route path="dashboard" element={<Dashboard />} />
-    <Route path="projetos" element={<Projetos />} />
-    <Route path="atividades" element={<Atividades />} />
-    <Route path="cadastro-usuario" element={<CadastroUsuario />} />
-    <Route path="relatorios" element={<Relatorios />} />
-  </Route>
-</Routes>
+        {/* Rotas do USUÁRIO COMUM */}
+        <Route
+          path="/user"
+          element={
+            <ProtectedRoute>
+              <UserLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<UserDashboard />} />
+          <Route path="projetos" element={<Projetos />} />
+          <Route path="atividades" element={<Atividades />} />
+          <Route path="toners" element={<Toners />} />
+        </Route>
+
+        {/* Rotas do ADMIN */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute adminOnly>
+              <Admin />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="projetos" element={<Projetos />} />
+          <Route path="atividades" element={<Atividades />} />
+          <Route path="cadastro-usuario" element={<CadastroUsuario />} />
+          <Route path="relatorios" element={<Relatorios />} />
+          <Route path="toners" element={<Toners />} />
+        </Route>
+      </Routes>
     </div>
   );
 }
