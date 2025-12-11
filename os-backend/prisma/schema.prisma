@@ -64,3 +64,54 @@ model Order {
   createdBy   User? @relation(fields: [createdById], references: [id])
   createdById Int?
 }
+
+model Toner {
+  id         Int       @id @default(autoincrement())
+  model      String
+  sku        String?   @unique
+  color      String    // ex: "Preto", "Ciano"
+  capacity   Int?      // páginas estimadas
+  stock      Int       @default(0)
+  minStock   Int       @default(1) // gatilho de alerta
+  location   String?      
+  supplierId Int?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  movements  TonerMovement[]
+}
+
+model Printer {
+  id         Int      @id @default(autoincrement())
+  name       String
+  location   String?
+  model      String?
+  serial     String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  movements  TonerMovement[]
+}
+
+model TonerMovement {
+  id          Int      @id @default(autoincrement())
+  tonerId     Int
+  printerId   Int?
+  type        String   // "entrada", "instalacao", "troca", "consumo", "ajuste"
+  quantity    Int      // + para entrada, - para consumo/ajuste negativo
+  note        String?
+  user        String?  // usuário que registrou
+  origin      String?  // ex: "ESTOQUE", "Sala 01"
+  destination String?  // ex: "Sala 01", "Impressora X"
+  createdAt   DateTime @default(now())
+
+  toner       Toner    @relation(fields: [tonerId], references: [id])
+  printer     Printer? @relation(fields: [printerId], references: [id])
+}
+
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  name      String
+  contact   String?
+  createdAt DateTime @default(now())
+  toners    Toner[]
+}

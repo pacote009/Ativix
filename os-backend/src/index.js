@@ -10,6 +10,7 @@ import projetosRoutes from './routes/projetos.js';
 import ordersRoutes from './routes/orders.js';
 import dashboardRoutes from './routes/dashboard.js';
 import relatoriosRoutes from './routes/relatorios.js';
+import tonersRoutes from './routes/toners.js';
 
 
 
@@ -27,6 +28,7 @@ app.use('/projetos', projetosRoutes);
 app.use('/orders', ordersRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/relatorios', relatoriosRoutes);
+app.use('/toners', tonersRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend rodando na porta ${PORT}`));
