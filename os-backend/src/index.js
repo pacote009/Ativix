@@ -12,13 +12,15 @@ import dashboardRoutes from './routes/dashboard.js';
 import relatoriosRoutes from './routes/relatorios.js';
 import tonersRoutes from './routes/toners.js';
 
-
-
-
-
 const app = express();
+
 app.use(cors());
-app.use(express.json());
+
+// --- ALTERAÇÃO AQUI ---
+// Aumentamos o limite para 50mb para aceitar imagens em Base64
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// ----------------------
 
 // rotas
 app.use('/auth', authRoutes);
