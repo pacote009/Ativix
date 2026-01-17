@@ -5,7 +5,9 @@ import { authMiddleware } from '../middlewares/auth.js';
 
 const router = express.Router();
 
-// Listar com filtros, paginação e filtro por intervalo de datas
+// --------------------------------------------------------------------------
+// GET /atividades (Listagem com filtros)
+// --------------------------------------------------------------------------
 router.get('/', async (req, res) => {
   try {
     const {
@@ -29,16 +31,13 @@ router.get('/', async (req, res) => {
     }
 
     if (search) {
-      // Postgres aceita mode: "insensitive"
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    // Decide qual campo de data usar:
-    // se o cliente especificou dateField, usa; senão:
-    // se status === 'finalizada' => filtra por completedAt, senão createdAt
+    // Decide qual campo de data usar
     const chosenDateField = dateField || (String(status).toLowerCase() === 'finalizada' ? 'completedAt' : 'createdAt');
 
     if (dateStart || dateEnd) {
@@ -50,7 +49,6 @@ router.get('/', async (req, res) => {
       if (dateEnd) {
         const end = new Date(dateEnd);
         if (!isNaN(end)) {
-          // tornar inclusivo até o final do dia
           end.setHours(23, 59, 59, 999);
           dateFilter.lte = end;
         }
@@ -86,11 +84,13 @@ router.get('/', async (req, res) => {
       title: a.title,
       description: a.description,
       status: a.status,
+      imagem: a.imagem, // <--- RETORNA A IMAGEM PARA O FRONT
       createdAt: a.createdAt,
       completedAt: a.completedAt,
       comentarios: a.comentarios || [],
       assignedTo: a.assignedTo ? a.assignedTo.username : null,
-      concluidoPor: a.concluidoPor || null
+      concluidoPor: a.concluidoPor || null,
+      autor: a.autor
     }));
 
     res.json({ data: mapped, total });
@@ -100,8 +100,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Resto das rotas (buscar 1, criar, patch, delete) mantém igual
-// (coloque aqui as outras rotas que você já tinha — manterei seus handlers originais)
+// --------------------------------------------------------------------------
+// GET /atividades/:id (Detalhe)
+// --------------------------------------------------------------------------
 router.get('/:id', async (req, res) => {
   const id = Number(req.params.id);
   const a = await prisma.atividade.findUnique({ where: { id }, include: { assignedTo: true }});
@@ -112,13 +113,15 @@ router.get('/:id', async (req, res) => {
   });
 });
 
-// POST /atividades  — com proteção contra duplicatas rápidas
-// POST /atividades — versão robusta com logs e fallback
-// POST /atividades — handler robusto (substitua o existente)
-// POST /atividades — versão rápida usando autor como String (username)
-router.post('/', async (req, res) => {
+// --------------------------------------------------------------------------
+// POST /atividades (Criação)
+// Agora suporta IMAGEM e pega o autor do Token
+// --------------------------------------------------------------------------
+router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { title, description, status, assignedTo, comentarios, autor } = req.body || {};
+    // 1. Pegamos 'imagem' do body e 'username' do usuário logado (token)
+    const { title, description, status, assignedTo, comentarios, imagem } = req.body || {};
+    const { username } = req.user; // Veio do authMiddleware
 
     if (!title || !description) {
       return res.status(400).json({ error: "title e description são obrigatórios" });
@@ -135,30 +138,21 @@ router.post('/', async (req, res) => {
       console.error("Erro ao buscar assignedTo (ignorado):", e.message || e);
     }
 
-    // prevenção de duplicatas rápidas (janela)
+    // 2. Prevenção de duplicatas rápidas (janela de 5s)
     const DUP_WINDOW_MS = 5000;
     const recentThreshold = new Date(Date.now() - DUP_WINDOW_MS);
 
-    let duplicateWhere = {
+    const duplicateWhere = {
       title,
       description,
+      autor: username, // Checa duplicata do mesmo autor
       createdAt: { gte: recentThreshold }
     };
 
-    // se cliente enviou autor (string), usa na condição de duplicata
-    if (typeof autor !== "undefined" && autor !== null) {
-      duplicateWhere = { ...duplicateWhere, autor };
-    }
-
-    let maybeDuplicate = null;
-    try {
-      maybeDuplicate = await prisma.atividade.findFirst({ where: duplicateWhere });
-    } catch (dupErr) {
-      console.error("Erro ao checar duplicata (ignorado):", dupErr.message || dupErr);
-      maybeDuplicate = null;
-    }
+    const maybeDuplicate = await prisma.atividade.findFirst({ where: duplicateWhere });
 
     if (maybeDuplicate) {
+      // Se for duplicata, retorna a existente
       const existing = await prisma.atividade.findUnique({
         where: { id: maybeDuplicate.id },
         include: { assignedTo: true }
@@ -166,24 +160,24 @@ router.post('/', async (req, res) => {
       return res.status(200).json({
         ...existing,
         assignedTo: existing.assignedTo ? existing.assignedTo.username : null,
-        autor: existing.autor || null,
         duplicated: true
       });
     }
 
-    // cria atividade usando campo autor (string)
+    // 3. Cria atividade com a IMAGEM
     const created = await prisma.atividade.create({
       data: {
         title,
         description,
+        imagem: imagem || null, // <--- Salva a string Base64 aqui
         status: status || 'pendente',
         comentarios: comentarios || [],
-        autor: typeof autor !== "undefined" ? autor : null,
+        autor: username, // Autor garantido pelo token
         ...(assignedToId ? { assignedToId } : {})
       }
     });
 
-    // retorna com usernames (compatível com frontend)
+    // Retorna formatado
     const full = await prisma.atividade.findUnique({
       where: { id: created.id },
       include: { assignedTo: true }
@@ -191,18 +185,18 @@ router.post('/', async (req, res) => {
 
     return res.status(201).json({
       ...full,
-      assignedTo: full.assignedTo ? full.assignedTo.username : null,
-      autor: full.autor || null
+      assignedTo: full.assignedTo ? full.assignedTo.username : null
     });
+
   } catch (err) {
-    console.error("Erro ao criar atividade (POST /atividades) ->", err && err.stack ? err.stack : err);
-    return res.status(500).json({ error: "Erro ao criar atividade", details: err && err.message ? err.message : String(err) });
+    console.error("Erro ao criar atividade (POST /atividades) ->", err);
+    return res.status(500).json({ error: "Erro ao criar atividade", details: err.message });
   }
 });
 
-
-
-
+// --------------------------------------------------------------------------
+// PATCH /atividades/:id (Atualização)
+// --------------------------------------------------------------------------
 router.patch('/:id', authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   const data = { ...req.body };
@@ -219,8 +213,6 @@ router.patch('/:id', authMiddleware, async (req, res) => {
     if (!data.concluidoPor) {
       if (req.user && req.user.username) {
         data.concluidoPor = req.user.username;
-      } else if (req.user && req.user.id) {
-        data.concluidoPor = String(req.user.id);
       }
     }
   }
@@ -235,20 +227,32 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// --------------------------------------------------------------------------
+// DELETE /atividades/:id (Exclusão)
+// Permite ADMIN ou o PRÓPRIO AUTOR
+// --------------------------------------------------------------------------
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    // checa permissão
-    if (!req.user || String(req.user.role).toUpperCase() !== 'ADMIN') {
-      return res.status(403).json({ error: 'Acesso negado: somente administradores podem excluir atividades.' });
+    const id = Number(req.params.id);
+    const { role, username } = req.user;
+
+    // 1. Busca a atividade para verificar quem é o dono
+    const atividade = await prisma.atividade.findUnique({ where: { id }});
+    if (!atividade) return res.status(404).json({ error: 'Atividade não encontrada.' });
+
+    // 2. Lógica de Permissão
+    const isAdmin = String(role).toUpperCase() === 'ADMIN';
+    const isAutor = atividade.autor === username;
+
+    // Se não for Admin E não for o Autor, bloqueia
+    if (!isAdmin && !isAutor) {
+      return res.status(403).json({ error: 'Você não tem permissão para excluir esta atividade.' });
     }
 
-    const id = Number(req.params.id);
-    // opcional: verificar existência antes de deletar
-    const exist = await prisma.atividade.findUnique({ where: { id }});
-    if (!exist) return res.status(404).json({ error: 'Atividade não encontrada.' });
-
+    // 3. Deleta
     await prisma.atividade.delete({ where: { id }});
-    return res.json({ success: true });
+    return res.json({ success: true, message: "Atividade excluída com sucesso" });
+
   } catch (err) {
     console.error('Erro ao deletar atividade:', err);
     return res.status(500).json({ error: 'Erro ao deletar atividade', details: err.message });

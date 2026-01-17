@@ -39,6 +39,7 @@ model Atividade {
   assignedTo   User?    @relation("UserAssigned", fields: [assignedToId], references: [id])
   assignedToId Int?
   concluidoPor String?
+  imagem       String?  // O '?' diz que é opcional. Se usar MySQL use @db.LongText, se Postgres use @db.Text
 }
 
 
