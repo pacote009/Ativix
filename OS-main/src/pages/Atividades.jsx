@@ -21,9 +21,9 @@ const Atividades = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Limite de 2MB para não pesar o banco
-      if (file.size > 2 * 1024 * 1024) {
-        alert("A imagem é muito grande! O tamanho máximo é 2MB.");
+      // Limite de 4MB para não pesar o banco
+      if (file.size > 4 * 1024 * 1024) {
+        alert("A imagem é muito grande! O tamanho máximo é 4MB.");
         return;
       }
 
