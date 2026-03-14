@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import saveAs from "file-saver";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   createEquipamento,
   getEquipamentos,
@@ -100,9 +103,66 @@ export default function Equipamentos() {
       await loadRelatorio(normalizedRelatorioParams);
       alert("Realocação registrada com sucesso.");
     } catch (error) {
-      console.error("Erro na realocaço:", error);
+      console.error("Erro na realocação:", error);
       alert(error?.response?.data?.error || "Erro ao realocar equipamento.");
     }
+  };
+
+  const exportCSV = () => {
+    const rows = relatorio?.equipamentos || [];
+    if (!rows.length) {
+      alert("Sem dados para exportar.");
+      return;
+    }
+
+    let csv = "Equipamento,Patrimônio,Chegada,Setor atual,Sala,Status\n";
+    rows.forEach((item) => {
+      const chegada = item.arrivalDate ? new Date(item.arrivalDate).toLocaleDateString("pt-BR") : "-";
+      csv += `"${(item.name || "").replace(/"/g, '""')}","${(item.assetTag || "-").replace(/"/g, '""')}","${chegada}","${(item.allocatedTo || "-").replace(/"/g, '""')}","${(item.room || "-").replace(/"/g, '""')}","${(item.status || "-").replace(/"/g, '""')}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    saveAs(blob, "relatorio-equipamentos.csv");
+  };
+
+  const exportPDF = () => {
+    const rows = relatorio?.equipamentos || [];
+    if (!rows.length) {
+      alert("Sem dados para exportar.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(16);
+    doc.text("Relatório de Equipamentos", 14, 18);
+
+    if (filtroRelatorio.dateStart || filtroRelatorio.dateEnd || filtroRelatorio.status) {
+      doc.setFontSize(10);
+      doc.text(
+        `Filtros: ${filtroRelatorio.dateStart || "-"} até ${filtroRelatorio.dateEnd || "-"} | Status: ${filtroRelatorio.status || "todos"}`,
+        14,
+        26
+      );
+    }
+
+    const tableRows = rows.map((item) => [
+      item.name || "-",
+      item.assetTag || "-",
+      item.arrivalDate ? new Date(item.arrivalDate).toLocaleDateString("pt-BR") : "-",
+      item.allocatedTo || "-",
+      item.room || "-",
+      item.status || "-",
+    ]);
+
+    autoTable(doc, {
+      startY: 32,
+      head: [["Equipamento", "Patrimônio", "Chegada", "Setor atual", "Sala", "Status"]],
+      body: tableRows,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [79, 70, 229] },
+    });
+
+    doc.save("relatorio-equipamentos.pdf");
   };
 
   const resumoStatus = useMemo(() => {
@@ -291,6 +351,15 @@ export default function Equipamentos() {
             onClick={() => loadRelatorio(normalizedRelatorioParams)}
           >
             Gerar relatório
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded" onClick={exportCSV}>
+            Exportar CSV
+          </button>
+          <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded" onClick={exportPDF}>
+            Exportar PDF
           </button>
         </div>
 
