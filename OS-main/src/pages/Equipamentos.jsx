@@ -100,7 +100,7 @@ export default function Equipamentos() {
       await loadRelatorio(normalizedRelatorioParams);
       alert("Realocação registrada com sucesso.");
     } catch (error) {
-      console.error("Erro na realocação:", error);
+      console.error("Erro na realocaço:", error);
       alert(error?.response?.data?.error || "Erro ao realocar equipamento.");
     }
   };
