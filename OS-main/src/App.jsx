@@ -11,6 +11,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import UserDashboard from "./pages/UserDashBoard";
 import UserLayout from "./pages/UserLayout"; 
 import Toners from "./pages/Toners";
+import Equipamentos from "./pages/Equipamentos";
 
 export default function App() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="projetos" element={<Projetos />} />
           <Route path="atividades" element={<Atividades />} />
           <Route path="toners" element={<Toners />} />
+          <Route path="equipamentos" element={<Equipamentos />} />
         </Route>
 
         {/* Rotas do ADMIN */}
@@ -72,6 +74,7 @@ export default function App() {
           <Route path="cadastro-usuario" element={<CadastroUsuario />} />
           <Route path="relatorios" element={<Relatorios />} />
           <Route path="toners" element={<Toners />} />
+          <Route path="equipamentos" element={<Equipamentos />} />
         </Route>
       </Routes>
     </div>

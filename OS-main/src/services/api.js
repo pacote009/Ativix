@@ -404,4 +404,13 @@ export const getTonerUsageReport = async (dateStart = null, dateEnd = null) => {
 };
 
 
+// ===== Equipamentos =====
+export const getEquipamentos = (params = {}) => api.get('/equipamentos', { params }).then(r => r.data);
+
+export const createEquipamento = (payload) => api.post('/equipamentos', payload).then(r => r.data);
+
+export const realocarEquipamento = (id, payload) => api.patch(`/equipamentos/${id}/realocar`, payload).then(r => r.data);
+
+export const getRelatorioEquipamentos = (params = {}) => api.get('/equipamentos/relatorio', { params }).then(r => r.data);
+
 export default api;
