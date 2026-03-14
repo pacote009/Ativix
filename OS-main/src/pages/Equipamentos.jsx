@@ -6,18 +6,21 @@ import {
   realocarEquipamento,
 } from "../services/api";
 
+const TI_SETOR = "Setor de TI";
+
 const initialForm = {
   name: "",
   category: "",
   assetTag: "",
   serialNumber: "",
   purchaseDate: "",
-  arrivalDate: "",
-  allocatedTo: "",
   room: "",
   status: "em_estoque",
   notes: "",
 };
+
+const inputClassName =
+  "w-full rounded-lg border border-slate-500 bg-slate-700 px-3 py-2 text-slate-100 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400";
 
 export default function Equipamentos() {
   const [form, setForm] = useState(initialForm);
@@ -27,11 +30,19 @@ export default function Equipamentos() {
   const [relatorio, setRelatorio] = useState(null);
   const [filtroRelatorio, setFiltroRelatorio] = useState({ dateStart: "", dateEnd: "", status: "" });
 
+  const normalizedRelatorioParams = useMemo(() => {
+    const params = {};
+    if (filtroRelatorio.dateStart) params.dateStart = filtroRelatorio.dateStart;
+    if (filtroRelatorio.dateEnd) params.dateEnd = filtroRelatorio.dateEnd;
+    if (filtroRelatorio.status) params.status = filtroRelatorio.status;
+    return params;
+  }, [filtroRelatorio]);
+
   const loadEquipamentos = async () => {
     setLoading(true);
     try {
       const data = await getEquipamentos(search ? { search } : {});
-      setItems(data);
+      setItems(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Erro ao carregar equipamentos:", error);
       alert("Não foi possível carregar os equipamentos.");
@@ -43,10 +54,11 @@ export default function Equipamentos() {
   const loadRelatorio = async (params = {}) => {
     try {
       const data = await getRelatorioEquipamentos(params);
-      setRelatorio(data);
+      setRelatorio(data || { total: 0, resumoStatus: {}, equipamentos: [] });
     } catch (error) {
       console.error("Erro no relatório:", error);
-      alert("Não foi possível gerar o relatório.");
+      alert(error?.response?.data?.error || "Não foi possível gerar o relatório.");
+      setRelatorio({ total: 0, resumoStatus: {}, equipamentos: [] });
     }
   };
 
@@ -58,11 +70,14 @@ export default function Equipamentos() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await createEquipamento(form);
+      await createEquipamento({
+        ...form,
+        allocatedTo: TI_SETOR,
+      });
       setForm(initialForm);
       await loadEquipamentos();
-      await loadRelatorio();
-      alert("Equipamento registrado com sucesso.");
+      await loadRelatorio(normalizedRelatorioParams);
+      alert("Equipamento registrado com sucesso. Entrada inicial no Setor de TI.");
     } catch (error) {
       console.error("Erro ao salvar:", error);
       alert(error?.response?.data?.error || "Erro ao registrar equipamento.");
@@ -76,15 +91,16 @@ export default function Equipamentos() {
     const room = window.prompt("Qual sala?", item.room || "");
     if (room === null) return;
 
-    const note = window.prompt("Observação (opcional):", "Realocado manualmente na tela de equipamentos") || "";
+    const note =
+      window.prompt("Observação (opcional):", "Realocado manualmente na tela de equipamentos") || "";
 
     try {
       await realocarEquipamento(item.id, { allocatedTo, room, note, status: "realocado" });
       await loadEquipamentos();
-      await loadRelatorio(filtroRelatorio);
+      await loadRelatorio(normalizedRelatorioParams);
       alert("Realocação registrada com sucesso.");
     } catch (error) {
-      console.error("Erro na realocação:", error);
+      console.error("Erro na realocaço:", error);
       alert(error?.response?.data?.error || "Erro ao realocar equipamento.");
     }
   };
@@ -98,28 +114,77 @@ export default function Equipamentos() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Equipamentos</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-300">Registre chegada, compra e realocações com relatório consolidado.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-300">
+          Registre chegada, compra e realocações com relatório consolidado.
+        </p>
       </div>
 
       <section className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow space-y-4">
         <h2 className="font-semibold text-lg">Nova chegada de equipamento</h2>
+        <p className="text-xs text-gray-500 dark:text-gray-300">
+          Todo novo equipamento entra inicialmente no <strong>{TI_SETOR}</strong>.
+        </p>
+
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input className="border rounded px-3 py-2 text-black" placeholder="Nome *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <input className="border rounded px-3 py-2 text-black" placeholder="Categoria" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-          <input className="border rounded px-3 py-2 text-black" placeholder="Patrimônio" value={form.assetTag} onChange={(e) => setForm({ ...form, assetTag: e.target.value })} />
-          <input className="border rounded px-3 py-2 text-black" placeholder="Serial" value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} />
-          <input className="border rounded px-3 py-2 text-black" type="date" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} />
-          <input className="border rounded px-3 py-2 text-black" type="date" value={form.arrivalDate} onChange={(e) => setForm({ ...form, arrivalDate: e.target.value })} />
-          <input className="border rounded px-3 py-2 text-black" placeholder="Realocado para" value={form.allocatedTo} onChange={(e) => setForm({ ...form, allocatedTo: e.target.value })} />
-          <input className="border rounded px-3 py-2 text-black" placeholder="Sala" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} />
-          <select className="border rounded px-3 py-2 text-black" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+          <input
+            className={inputClassName}
+            placeholder="Nome *"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            required
+          />
+          <input
+            className={inputClassName}
+            placeholder="Categoria"
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+          />
+          <input
+            className={inputClassName}
+            placeholder="Patrimônio"
+            value={form.assetTag}
+            onChange={(e) => setForm({ ...form, assetTag: e.target.value })}
+          />
+          <input
+            className={inputClassName}
+            placeholder="Serial"
+            value={form.serialNumber}
+            onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
+          />
+          <input
+            className={inputClassName}
+            type="date"
+            value={form.purchaseDate}
+            onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
+          />
+          <input
+            className={inputClassName}
+            placeholder="Sala inicial (opcional)"
+            value={form.room}
+            onChange={(e) => setForm({ ...form, room: e.target.value })}
+          />
+          <input className={`${inputClassName} md:col-span-1`} value={TI_SETOR} readOnly />
+          <select
+            className={inputClassName}
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+          >
             <option value="em_estoque">Em estoque</option>
             <option value="em_uso">Em uso</option>
             <option value="realocado">Realocado</option>
             <option value="manutencao">Manutenção</option>
           </select>
-          <textarea className="border rounded px-3 py-2 md:col-span-3 text-black" placeholder="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded md:col-span-3" type="submit">
+          <div />
+          <textarea
+            className={`${inputClassName} md:col-span-3 min-h-24`}
+            placeholder="Observações"
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          />
+          <button
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded md:col-span-3"
+            type="submit"
+          >
             Registrar chegada
           </button>
         </form>
@@ -130,13 +195,16 @@ export default function Equipamentos() {
           <div className="flex-1">
             <label className="text-sm font-medium">Buscar</label>
             <input
-              className="w-full border rounded px-3 py-2 text-black"
+              className={inputClassName}
               placeholder="Nome, patrimônio, serial ou setor"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <button className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded" onClick={loadEquipamentos}>
+          <button
+            className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded"
+            onClick={loadEquipamentos}
+          >
             Filtrar
           </button>
         </div>
@@ -155,9 +223,17 @@ export default function Equipamentos() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="py-4">Carregando...</td></tr>
+                <tr>
+                  <td colSpan={6} className="py-4">
+                    Carregando...
+                  </td>
+                </tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={6} className="py-4 text-gray-500">Nenhum equipamento encontrado.</td></tr>
+                <tr>
+                  <td colSpan={6} className="py-4 text-gray-500">
+                    Nenhum equipamento encontrado.
+                  </td>
+                </tr>
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="border-b">
@@ -165,7 +241,9 @@ export default function Equipamentos() {
                       <p className="font-medium">{item.name}</p>
                       <p className="text-xs text-gray-500">Patrimônio: {item.assetTag || "-"}</p>
                     </td>
-                    <td>{item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString("pt-BR") : "-"}</td>
+                    <td>
+                      {item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString("pt-BR") : "-"}
+                    </td>
                     <td>{item.allocatedTo || "-"}</td>
                     <td>{item.room || "-"}</td>
                     <td>{item.status}</td>
@@ -185,9 +263,23 @@ export default function Equipamentos() {
       <section className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow space-y-4">
         <h2 className="font-semibold text-lg">Relatório de equipamentos</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input type="date" className="border rounded px-3 py-2 text-black" value={filtroRelatorio.dateStart} onChange={(e) => setFiltroRelatorio({ ...filtroRelatorio, dateStart: e.target.value })} />
-          <input type="date" className="border rounded px-3 py-2 text-black" value={filtroRelatorio.dateEnd} onChange={(e) => setFiltroRelatorio({ ...filtroRelatorio, dateEnd: e.target.value })} />
-          <select className="border rounded px-3 py-2 text-black" value={filtroRelatorio.status} onChange={(e) => setFiltroRelatorio({ ...filtroRelatorio, status: e.target.value })}>
+          <input
+            type="date"
+            className={inputClassName}
+            value={filtroRelatorio.dateStart}
+            onChange={(e) => setFiltroRelatorio({ ...filtroRelatorio, dateStart: e.target.value })}
+          />
+          <input
+            type="date"
+            className={inputClassName}
+            value={filtroRelatorio.dateEnd}
+            onChange={(e) => setFiltroRelatorio({ ...filtroRelatorio, dateEnd: e.target.value })}
+          />
+          <select
+            className={inputClassName}
+            value={filtroRelatorio.status}
+            onChange={(e) => setFiltroRelatorio({ ...filtroRelatorio, status: e.target.value })}
+          >
             <option value="">Todos status</option>
             <option value="em_estoque">Em estoque</option>
             <option value="em_uso">Em uso</option>
@@ -196,7 +288,7 @@ export default function Equipamentos() {
           </select>
           <button
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded"
-            onClick={() => loadRelatorio(filtroRelatorio)}
+            onClick={() => loadRelatorio(normalizedRelatorioParams)}
           >
             Gerar relatório
           </button>
@@ -213,6 +305,41 @@ export default function Equipamentos() {
               <p className="text-2xl font-bold">{total}</p>
             </div>
           ))}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left border-b">
+                <th className="py-2">Equipamento</th>
+                <th>Patrimônio</th>
+                <th>Chegada</th>
+                <th>Setor atual</th>
+                <th>Sala</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(relatorio?.equipamentos || []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-4 text-gray-500">
+                    Sem dados para os filtros selecionados.
+                  </td>
+                </tr>
+              ) : (
+                (relatorio?.equipamentos || []).map((item) => (
+                  <tr key={item.id} className="border-b">
+                    <td className="py-2">{item.name}</td>
+                    <td>{item.assetTag || "-"}</td>
+                    <td>{item.arrivalDate ? new Date(item.arrivalDate).toLocaleDateString("pt-BR") : "-"}</td>
+                    <td>{item.allocatedTo || "-"}</td>
+                    <td>{item.room || "-"}</td>
+                    <td>{item.status}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>

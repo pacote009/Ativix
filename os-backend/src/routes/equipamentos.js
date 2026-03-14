@@ -4,6 +4,8 @@ import { authMiddleware } from '../middlewares/auth.js';
 
 const router = express.Router();
 
+const TI_SETOR = 'Setor de TI';
+
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const { status, room, search } = req.query;
@@ -43,7 +45,6 @@ router.post('/', authMiddleware, async (req, res) => {
       serialNumber,
       purchaseDate,
       arrivalDate,
-      allocatedTo,
       room,
       status,
       notes
@@ -60,7 +61,7 @@ router.post('/', authMiddleware, async (req, res) => {
           serialNumber: serialNumber || null,
           purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
           arrivalDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-          allocatedTo: allocatedTo || null,
+          allocatedTo: TI_SETOR,
           room: room || null,
           status: status || 'em_estoque',
           notes: notes || null,
@@ -72,7 +73,7 @@ router.post('/', authMiddleware, async (req, res) => {
         data: {
           equipmentId: equipamento.id,
           type: 'CHEGADA',
-          toLocation: allocatedTo || 'Estoque',
+          toLocation: TI_SETOR,
           room: room || null,
           note: notes || 'Registro de chegada do equipamento',
           createdBy: req.user?.username || 'sistema'
