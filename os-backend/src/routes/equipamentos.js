@@ -6,6 +6,8 @@ const router = express.Router();
 
 const TI_SETOR = 'Setor de TI';
 
+const isAdmin = (req) => String(req.user?.role || '').toUpperCase() === 'ADMIN';
+
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const { status, room, search } = req.query;
@@ -90,6 +92,56 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Patrimônio ou serial já cadastrados.' });
     }
     res.status(500).json({ error: 'Erro ao criar equipamento', details: error.message });
+  }
+});
+
+// Alterar equipamento (somente admin)
+router.patch('/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Somente administradores podem alterar equipamentos.' });
+    }
+
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido' });
+
+    const payload = { ...req.body };
+
+    if (payload.purchaseDate !== undefined) {
+      payload.purchaseDate = payload.purchaseDate ? new Date(payload.purchaseDate) : null;
+    }
+
+    const updated = await prisma.equipment.update({
+      where: { id },
+      data: payload,
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Erro ao alterar equipamento:', error);
+    if (error?.code === 'P2025') return res.status(404).json({ error: 'Equipamento não encontrado.' });
+    if (error?.code === 'P2002') return res.status(400).json({ error: 'Patrimônio ou serial já cadastrados.' });
+    res.status(500).json({ error: 'Erro ao alterar equipamento', details: error.message });
+  }
+});
+
+// Excluir equipamento (somente admin)
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Somente administradores podem excluir equipamentos.' });
+    }
+
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido' });
+
+    await prisma.equipment.delete({ where: { id } });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao excluir equipamento:', error);
+    if (error?.code === 'P2025') return res.status(404).json({ error: 'Equipamento não encontrado.' });
+    res.status(500).json({ error: 'Erro ao excluir equipamento', details: error.message });
   }
 });
 

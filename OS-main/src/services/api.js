@@ -411,6 +411,17 @@ export const createEquipamento = (payload) => api.post('/equipamentos', payload)
 
 export const realocarEquipamento = (id, payload) => api.patch(`/equipamentos/${id}/realocar`, payload).then(r => r.data);
 
+// ===== Equipamentos =====
+export const getEquipamentos = (params = {}) => api.get('/equipamentos', { params }).then(r => r.data);
+
+export const createEquipamento = (payload) => api.post('/equipamentos', payload).then(r => r.data);
+
+export const realocarEquipamento = (id, payload) => api.patch(`/equipamentos/${id}/realocar`, payload).then(r => r.data);
+
+export const updateEquipamento = (id, payload) => api.patch(`/equipamentos/${id}`, payload).then(r => r.data);
+
+export const deleteEquipamento = (id) => api.delete(`/equipamentos/${id}`).then(r => r.data);
+
 export const getRelatorioEquipamentos = (params = {}) => api.get('/equipamentos/relatorio', { params }).then(r => r.data);
 
 export default api;

@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import saveAs from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getCurrentUser } from "../auth";
 import {
   createEquipamento,
+  deleteEquipamento,
   getEquipamentos,
   getRelatorioEquipamentos,
   realocarEquipamento,
+  updateEquipamento,
 } from "../services/api";
 
 const TI_SETOR = "Setor de TI";
@@ -32,6 +35,8 @@ export default function Equipamentos() {
   const [loading, setLoading] = useState(false);
   const [relatorio, setRelatorio] = useState(null);
   const [filtroRelatorio, setFiltroRelatorio] = useState({ dateStart: "", dateEnd: "", status: "" });
+  const user = getCurrentUser();
+  const isAdmin = String(user?.role || "").toUpperCase() === "ADMIN";
 
   const normalizedRelatorioParams = useMemo(() => {
     const params = {};
@@ -67,8 +72,11 @@ export default function Equipamentos() {
 
   useEffect(() => {
     loadEquipamentos();
-    loadRelatorio();
   }, []);
+
+  useEffect(() => {
+    loadRelatorio(normalizedRelatorioParams);
+  }, [normalizedRelatorioParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -105,6 +113,60 @@ export default function Equipamentos() {
     } catch (error) {
       console.error("Erro na realocação:", error);
       alert(error?.response?.data?.error || "Erro ao realocar equipamento.");
+    }
+  };
+
+  const handleEditar = async (item) => {
+    if (!isAdmin) return;
+
+    const name = window.prompt("Nome do equipamento:", item.name || "");
+    if (name === null || !name.trim()) return;
+    const category = window.prompt("Categoria:", item.category || "") ?? item.category;
+    const assetTag = window.prompt("Patrimônio:", item.assetTag || "") ?? item.assetTag;
+    const serialNumber = window.prompt("Serial:", item.serialNumber || "") ?? item.serialNumber;
+    const purchaseDateInput = window.prompt(
+      "Data de compra (YYYY-MM-DD):",
+      item.purchaseDate ? new Date(item.purchaseDate).toISOString().slice(0, 10) : ""
+    );
+    if (purchaseDateInput === null) return;
+    const room = window.prompt("Sala:", item.room || "") ?? item.room;
+    const status = window.prompt("Status (em_estoque, em_uso, realocado, manutencao):", item.status || "em_estoque");
+    if (status === null) return;
+    const notes = window.prompt("Observações:", item.notes || "") ?? item.notes;
+
+    try {
+      await updateEquipamento(item.id, {
+        name: name.trim(),
+        category: category || null,
+        assetTag: assetTag || null,
+        serialNumber: serialNumber || null,
+        purchaseDate: purchaseDateInput || null,
+        room: room || null,
+        status: status || item.status,
+        notes: notes || null,
+      });
+      await loadEquipamentos();
+      await loadRelatorio(normalizedRelatorioParams);
+      alert("Equipamento atualizado com sucesso.");
+    } catch (error) {
+      console.error("Erro ao editar equipamento:", error);
+      alert(error?.response?.data?.error || "Erro ao editar equipamento.");
+    }
+  };
+
+  const handleExcluir = async (item) => {
+    if (!isAdmin) return;
+    const ok = window.confirm(`Deseja excluir o equipamento \"${item.name}\"? Esta ação não pode ser desfeita.`);
+    if (!ok) return;
+
+    try {
+      await deleteEquipamento(item.id);
+      await loadEquipamentos();
+      await loadRelatorio(normalizedRelatorioParams);
+      alert("Equipamento excluído com sucesso.");
+    } catch (error) {
+      console.error("Erro ao excluir equipamento:", error);
+      alert(error?.response?.data?.error || "Erro ao excluir equipamento.");
     }
   };
 
@@ -307,10 +369,20 @@ export default function Equipamentos() {
                     <td>{item.allocatedTo || "-"}</td>
                     <td>{item.room || "-"}</td>
                     <td>{item.status}</td>
-                    <td>
+                    <td className="space-x-3">
                       <button className="text-indigo-600 hover:underline" onClick={() => handleRealocar(item)}>
                         Realocar
                       </button>
+                      {isAdmin && (
+                        <>
+                          <button className="text-yellow-600 hover:underline" onClick={() => handleEditar(item)}>
+                            Editar
+                          </button>
+                          <button className="text-red-600 hover:underline" onClick={() => handleExcluir(item)}>
+                            Excluir
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -322,7 +394,7 @@ export default function Equipamentos() {
 
       <section className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow space-y-4">
         <h2 className="font-semibold text-lg">Relatório de equipamentos</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
             type="date"
             className={inputClassName}
@@ -346,12 +418,6 @@ export default function Equipamentos() {
             <option value="realocado">Realocado</option>
             <option value="manutencao">Manutenção</option>
           </select>
-          <button
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded"
-            onClick={() => loadRelatorio(normalizedRelatorioParams)}
-          >
-            Gerar relatório
-          </button>
         </div>
 
         <div className="flex flex-wrap gap-3">
