@@ -6,9 +6,17 @@ import { authMiddleware } from '../middlewares/auth.js';
 
 const router = express.Router();
 
+function isStrongPassword(password = '') {
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(String(password));
+}
+
 // lista de usuários (público, sem senha)
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
+    if (String(req.user?.role || '').toUpperCase() !== 'ADMIN') {
+      return res.status(403).json({ error: 'Somente administradores podem listar usuários.' });
+    }
+
     const users = await prisma.user.findMany({
       select: { id: true, name: true, username: true, email: true, role: true }
     });
@@ -27,9 +35,14 @@ router.post('/signup', async (req, res) => {
   try {
     const { name, username, password, email } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'username e password obrigatórios' });
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({
+        error: 'Senha fraca. Use no mínimo 8 caracteres com maiúscula, minúscula, número e símbolo.'
+      });
+    }
 
     const exists = await prisma.user.findUnique({ where: { username } });
-    if (exists) return res.status(400).json({ error: 'username já existe' });
+    if (exists) return res.status(400).json({ error: 'Não foi possível criar usuário com os dados informados.' });
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
@@ -53,6 +66,14 @@ router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, username, password, email, role } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'username e password obrigatórios' });
+    if (String(req.user?.role || '').toUpperCase() !== 'ADMIN') {
+      return res.status(403).json({ error: 'Somente administradores podem criar usuários.' });
+    }
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({
+        error: 'Senha fraca. Use no mínimo 8 caracteres com maiúscula, minúscula, número e símbolo.'
+      });
+    }
 
     // Se pediu criar ADMIN, só quem é ADMIN pode
     if (role === 'ADMIN' && req.user.role !== 'ADMIN') {
@@ -63,7 +84,7 @@ router.post('/', authMiddleware, async (req, res) => {
     const finalRole = role === 'ADMIN' ? 'ADMIN' : 'USER';
 
     const exists = await prisma.user.findUnique({ where: { username } });
-    if (exists) return res.status(400).json({ error: 'username já existe' });
+    if (exists) return res.status(400).json({ error: 'Não foi possível criar usuário com os dados informados.' });
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
@@ -89,8 +110,10 @@ router.patch('/:id/reset-password', authMiddleware, async (req, res) => {
     const { newPassword } = req.body;
 
     if (!id) return res.status(400).json({ error: 'ID inválido.' });
-    if (!newPassword || String(newPassword).length < 6) {
-      return res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        error: 'Senha fraca. Use no mínimo 8 caracteres com maiúscula, minúscula, número e símbolo.'
+      });
     }
 
     const hashed = await bcrypt.hash(String(newPassword), 10);
