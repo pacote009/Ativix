@@ -35,6 +35,7 @@ export default function Equipamentos() {
   const [loading, setLoading] = useState(false);
   const [relatorio, setRelatorio] = useState(null);
   const [filtroRelatorio, setFiltroRelatorio] = useState({ dateStart: "", dateEnd: "", status: "" });
+  const [feedback, setFeedback] = useState({ type: "", message: "", detail: "" });
   const user = getCurrentUser();
   const isAdmin = String(user?.role || "").toUpperCase() === "ADMIN";
 
@@ -46,6 +47,10 @@ export default function Equipamentos() {
     return params;
   }, [filtroRelatorio]);
 
+  const showFeedback = (type, message, detail = "") => {
+    setFeedback({ type, message, detail });
+  };
+
   const loadEquipamentos = async () => {
     setLoading(true);
     try {
@@ -53,7 +58,7 @@ export default function Equipamentos() {
       setItems(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Erro ao carregar equipamentos:", error);
-      alert("Não foi possível carregar os equipamentos.");
+      showFeedback("error", "Falha ao carregar equipamentos.", "Verifique sua conexão e tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -65,7 +70,11 @@ export default function Equipamentos() {
       setRelatorio(data || { total: 0, resumoStatus: {}, equipamentos: [] });
     } catch (error) {
       console.error("Erro no relatório:", error);
-      alert(error?.response?.data?.error || "Não foi possível gerar o relatório.");
+      showFeedback(
+        "error",
+        "Falha ao gerar relatório.",
+        error?.response?.data?.error || "Valide os filtros e tente novamente."
+      );
       setRelatorio({ total: 0, resumoStatus: {}, equipamentos: [] });
     }
   };
@@ -88,10 +97,14 @@ export default function Equipamentos() {
       setForm(initialForm);
       await loadEquipamentos();
       await loadRelatorio(normalizedRelatorioParams);
-      alert("Equipamento registrado com sucesso. Entrada inicial no Setor de TI.");
+      showFeedback("success", "Equipamento registrado com sucesso.", "Entrada inicial realizada no Setor de TI.");
     } catch (error) {
       console.error("Erro ao salvar:", error);
-      alert(error?.response?.data?.error || "Erro ao registrar equipamento.");
+      showFeedback(
+        "error",
+        "Não foi possível registrar o equipamento.",
+        error?.response?.data?.error || "Revise os dados informados."
+      );
     }
   };
 
@@ -109,10 +122,14 @@ export default function Equipamentos() {
       await realocarEquipamento(item.id, { allocatedTo, room, note, status: "realocado" });
       await loadEquipamentos();
       await loadRelatorio(normalizedRelatorioParams);
-      alert("Realocação registrada com sucesso.");
+      showFeedback("success", "Realocação registrada com sucesso.");
     } catch (error) {
       console.error("Erro na realocação:", error);
-      alert(error?.response?.data?.error || "Erro ao realocar equipamento.");
+      showFeedback(
+        "error",
+        "Não foi possível realocar o equipamento.",
+        error?.response?.data?.error || "Valide setor/sala e tente novamente."
+      );
     }
   };
 
@@ -147,10 +164,14 @@ export default function Equipamentos() {
       });
       await loadEquipamentos();
       await loadRelatorio(normalizedRelatorioParams);
-      alert("Equipamento atualizado com sucesso.");
+      showFeedback("success", "Equipamento atualizado com sucesso.");
     } catch (error) {
       console.error("Erro ao editar equipamento:", error);
-      alert(error?.response?.data?.error || "Erro ao editar equipamento.");
+      showFeedback(
+        "error",
+        "Não foi possível editar o equipamento.",
+        error?.response?.data?.error || "Revise os dados e tente novamente."
+      );
     }
   };
 
@@ -163,17 +184,21 @@ export default function Equipamentos() {
       await deleteEquipamento(item.id);
       await loadEquipamentos();
       await loadRelatorio(normalizedRelatorioParams);
-      alert("Equipamento excluído com sucesso.");
+      showFeedback("success", "Equipamento excluído com sucesso.");
     } catch (error) {
       console.error("Erro ao excluir equipamento:", error);
-      alert(error?.response?.data?.error || "Erro ao excluir equipamento.");
+      showFeedback(
+        "error",
+        "Não foi possível excluir o equipamento.",
+        error?.response?.data?.error || "Tente novamente em alguns instantes."
+      );
     }
   };
 
   const exportCSV = () => {
     const rows = relatorio?.equipamentos || [];
     if (!rows.length) {
-      alert("Sem dados para exportar.");
+      showFeedback("info", "Sem dados para exportar.", "Ajuste os filtros e gere o relatório novamente.");
       return;
     }
 
@@ -190,7 +215,7 @@ export default function Equipamentos() {
   const exportPDF = () => {
     const rows = relatorio?.equipamentos || [];
     if (!rows.length) {
-      alert("Sem dados para exportar.");
+      showFeedback("info", "Sem dados para exportar.", "Ajuste os filtros e gere o relatório novamente.");
       return;
     }
 
@@ -240,6 +265,28 @@ export default function Equipamentos() {
           Registre chegada, compra e realocações com relatório consolidado.
         </p>
       </div>
+
+      {feedback?.message && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            feedback.type === "success"
+              ? "border-green-500/50 bg-green-500/10 text-green-200"
+              : feedback.type === "error"
+              ? "border-red-500/50 bg-red-500/10 text-red-200"
+              : "border-amber-500/50 bg-amber-500/10 text-amber-200"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold">{feedback.message}</p>
+              {feedback.detail ? <p className="mt-1 opacity-90">{feedback.detail}</p> : null}
+            </div>
+            <button className="text-xs underline" onClick={() => setFeedback({ type: "", message: "", detail: "" })}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow space-y-4">
         <h2 className="font-semibold text-lg">Nova chegada de equipamento</h2>

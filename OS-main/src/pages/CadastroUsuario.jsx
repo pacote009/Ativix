@@ -19,6 +19,8 @@ const CadastroUsuario = () => {
   const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
   const [resetMsg, setResetMsg] = useState("");
   const [resetErr, setResetErr] = useState("");
+  const [deleteMsg, setDeleteMsg] = useState("");
+  const [deleteErr, setDeleteErr] = useState("");
 
   const isCurrentUserAdmin = currentUser?.role === "ADMIN";
 
@@ -131,6 +133,46 @@ const CadastroUsuario = () => {
     }
   };
 
+  const handleExcluirUsuario = async () => {
+    setDeleteErr("");
+    setDeleteMsg("");
+
+    if (!isCurrentUserAdmin) {
+      setDeleteErr("Somente administradores podem excluir usuários.");
+      return;
+    }
+
+    if (!usuarioResetId) {
+      setDeleteErr("Selecione um usuário para excluir.");
+      return;
+    }
+
+    const selectedUser = usuarios.find((u) => String(u.id) === String(usuarioResetId));
+    if (!selectedUser) {
+      setDeleteErr("Usuário inválido.");
+      return;
+    }
+
+    if (String(selectedUser.id) === String(currentUser?.id)) {
+      setDeleteErr("Você não pode excluir seu próprio usuário.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir o usuário "${selectedUser.username}"? Esta ação não pode ser desfeita.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/users/${selectedUser.id}`);
+      setDeleteMsg(`Usuário ${selectedUser.username} excluído com sucesso.`);
+      await loadUsuarios();
+    } catch (err) {
+      console.error(err);
+      setDeleteErr(err.response?.data?.error || "Erro ao excluir usuário.");
+    }
+  };
+
   return (
     <div className="flex justify-center items-center min-h-screen bg-gradient-to-tr from-indigo-900 via-gray-900 to-black px-4">
       <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl w-full max-w-3xl p-10 border border-white/20 space-y-10">
@@ -236,6 +278,8 @@ const CadastroUsuario = () => {
 
             {resetErr && <div className="mb-4 p-3 bg-red-500/20 text-red-200 text-sm rounded-lg">{resetErr}</div>}
             {resetMsg && <div className="mb-4 p-3 bg-green-500/20 text-green-200 text-sm rounded-lg">{resetMsg}</div>}
+            {deleteErr && <div className="mb-4 p-3 bg-red-500/20 text-red-200 text-sm rounded-lg">{deleteErr}</div>}
+            {deleteMsg && <div className="mb-4 p-3 bg-green-500/20 text-green-200 text-sm rounded-lg">{deleteMsg}</div>}
 
             <form onSubmit={handleResetSenha} className="space-y-4">
               <div>
@@ -277,6 +321,14 @@ const CadastroUsuario = () => {
 
               <button type="submit" className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold">
                 Resetar senha
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExcluirUsuario}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 text-white font-bold"
+              >
+                Excluir usuário selecionado
               </button>
             </form>
           </section>
