@@ -6,6 +6,7 @@ import { FaPlus, FaImage } from "react-icons/fa"; // Adicionei ícone de imagem
 import { getCurrentUser } from "../auth";
 import ModalFixar from "../components/ModalFixar";
 import { motion } from "framer-motion";
+import InfoModal from "../components/InfoModal";
 
 const Atividades = () => {
   const [modalFixarAtividade, setModalFixarAtividade] = useState(null);
@@ -15,7 +16,10 @@ const Atividades = () => {
   const [novaAtividade, setNovaAtividade] = useState({ title: "", description: "", imagem: "" });
   
   const [reload, setReload] = useState(false);
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
   const user = getCurrentUser();
+
+  const showDialog = (title, message) => setDialog({ open: true, title, message });
 
   // 2. Função para converter imagem em Base64
   const handleImageChange = (e) => {
@@ -23,7 +27,7 @@ const Atividades = () => {
     if (file) {
       // Limite de 4MB para não pesar o banco
       if (file.size > 4 * 1024 * 1024) {
-        alert("A imagem é muito grande! O tamanho máximo é 4MB.");
+        showDialog("Arquivo inválido", "A imagem é muito grande. O tamanho máximo é 4MB.");
         return;
       }
 
@@ -38,12 +42,12 @@ const Atividades = () => {
   const handleRegistrarAtividade = async (e) => {
     e.preventDefault();
     if (!user) {
-      alert("Você precisa estar logado!");
+      showDialog("Sessão inválida", "Você precisa estar logado para registrar uma atividade.");
       return;
     }
 
     if (!novaAtividade.title.trim() || !novaAtividade.description.trim()) {
-      alert("Preencha título e descrição!");
+      showDialog("Campos obrigatórios", "Preencha título e descrição antes de continuar.");
       return;
     }
 
@@ -63,7 +67,10 @@ const Atividades = () => {
       setReload((prev) => !prev);
     } catch (error) {
       console.error("Erro ao registrar atividade:", error);
-      alert("Erro ao registrar atividade!");
+      showDialog(
+        "Falha ao registrar atividade",
+        error?.response?.data?.error || "Não foi possível registrar a atividade. Verifique os campos e tente novamente."
+      );
     }
   };
 
@@ -187,6 +194,13 @@ const Atividades = () => {
         reload={reload}
         setModalFixarAtividade={setModalFixarAtividade}
         onGlobalUpdate={() => setReload((prev) => !prev)}
+      />
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
       />
     </div>
   );

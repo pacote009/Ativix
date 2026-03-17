@@ -1,6 +1,7 @@
 // src/components/TonerFormModal.jsx
 import React, { useState, useEffect } from "react";
 import { createToner } from "../services/api";
+import InfoModal from "./InfoModal";
 
 export default function TonerFormModal({ open = false, onClose = () => {}, onSaved = () => {}, initialData = null }) {
   const [form, setForm] = useState({
@@ -12,6 +13,9 @@ export default function TonerFormModal({ open = false, onClose = () => {}, onSav
     location: ""
   });
   const [saving, setSaving] = useState(false);
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
+
+  const showDialog = (title, message) => setDialog({ open: true, title, message });
 
   useEffect(() => {
     if (initialData) {
@@ -47,7 +51,7 @@ export default function TonerFormModal({ open = false, onClose = () => {}, onSav
     e.preventDefault();
     if (saving) return;
     if (!form.model.trim() || !form.color.trim()) {
-      alert("Modelo e cor são obrigatórios.");
+      showDialog("Campos obrigatórios", "Modelo e cor são obrigatórios.");
       return;
     }
 
@@ -94,7 +98,7 @@ export default function TonerFormModal({ open = false, onClose = () => {}, onSav
     } catch (err) {
       console.error("Erro ao salvar toner:", err);
       const msg = err?.message || "Erro desconhecido";
-      alert(`Erro ao salvar toner: ${msg}`);
+      showDialog("Falha ao salvar toner", `Erro ao salvar toner: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -150,6 +154,13 @@ export default function TonerFormModal({ open = false, onClose = () => {}, onSav
           <button type="submit" disabled={saving} className="px-3 py-1.5 rounded bg-green-600 text-white">{saving ? "Salvando..." : "Salvar"}</button>
         </div>
       </form>
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
+      />
     </div>
   );
 }

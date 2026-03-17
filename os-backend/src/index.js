@@ -11,6 +11,7 @@ import ordersRoutes from './routes/orders.js';
 import dashboardRoutes from './routes/dashboard.js';
 import relatoriosRoutes from './routes/relatorios.js';
 import tonersRoutes from './routes/toners.js';
+import equipamentosRoutes from './routes/equipamentos.js';
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/orders', ordersRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/relatorios', relatoriosRoutes);
 app.use('/toners', tonersRoutes);
+app.use('/equipamentos', equipamentosRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend rodando na porta ${PORT}`));

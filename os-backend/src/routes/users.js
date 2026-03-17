@@ -78,15 +78,69 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
+// reset de senha — protegido (somente admin)
+router.patch('/:id/reset-password', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Somente administradores podem resetar senhas.' });
+    }
+
+    const id = Number(req.params.id);
+    const { newPassword } = req.body;
+
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    if (!newPassword || String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    }
+
+    const hashed = await bcrypt.hash(String(newPassword), 10);
+
+    await prisma.user.update({
+      where: { id },
+      data: { password: hashed }
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    if (err?.code === 'P2025') return res.status(404).json({ error: 'Usuário não encontrado.' });
+    res.status(500).json({ error: 'Erro ao resetar senha' });
+  }
+});
+
 // deletar usuário — protegido (somente admin)
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Somente admin' });
-    await prisma.user.delete({ where: { id }});
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Somente administradores podem excluir usuários.' });
+
+    const currentUserId = Number(req.user?.id);
+    if (currentUserId && currentUserId === id) {
+      return res.status(400).json({ error: 'Você não pode excluir seu próprio usuário.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, role: true }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    if (targetUser.role === 'ADMIN') {
+      const adminsCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+      if (adminsCount <= 1) {
+        return res.status(400).json({ error: 'Não é possível excluir o último administrador do sistema.' });
+      }
+    }
+
+    await prisma.user.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
     console.error(err);
+    if (err?.code === 'P2025') return res.status(404).json({ error: 'Usuário não encontrado.' });
     res.status(500).json({ error: 'Erro ao deletar usuário' });
   }
 });

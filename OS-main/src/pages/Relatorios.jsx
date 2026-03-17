@@ -13,6 +13,7 @@ import {
 import saveAs from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import InfoModal from "../components/InfoModal";
 
 const Relatorios = () => {
   const [activeTab, setActiveTab] = useState("usuarios");
@@ -23,7 +24,10 @@ const Relatorios = () => {
   const [tonerModalOpen, setTonerModalOpen] = useState(false);
   const [tonerReport, setTonerReport] = useState(null);
   const [selectedTonerId, setSelectedTonerId] = useState(""); // filtro para movimentações
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
   const observerRef = useRef(null);
+
+  const showDialog = (title, message) => setDialog({ open: true, title, message });
 
   useEffect(() => {
     loadData(activeTab, dateStart, dateEnd);
@@ -157,7 +161,7 @@ const Relatorios = () => {
       if (openModal) setTonerModalOpen(true);
     } catch (err) {
       console.error("Erro ao carregar relatório de toners:", err);
-      alert("Erro ao carregar relatório de toners");
+      showDialog("Falha ao carregar relatório", "Erro ao carregar relatório de toners.");
     }
   };
 
@@ -165,7 +169,10 @@ const Relatorios = () => {
   const exportTonerPDF = async () => {
     try {
       const rep = tonerReport || (await getTonerUsageReport(dateStart || null, dateEnd || null));
-      if (!rep) return alert("Sem dados de toner para exportar");
+      if (!rep) {
+        showDialog("Sem dados", "Sem dados de toner para exportar.");
+        return;
+      }
 
       const doc = new jsPDF({ orientation: "landscape" });
       doc.setFontSize(16);
@@ -268,7 +275,7 @@ const Relatorios = () => {
       doc.save(`relatorio-toners-${(dateStart||'all')}-${(dateEnd||'all')}.pdf`);
     } catch (err) {
       console.error("Erro exportar PDF toners:", err);
-      alert("Erro ao exportar PDF do relatório de toners");
+      showDialog("Falha ao exportar PDF", "Erro ao exportar PDF do relatório de toners.");
     }
   };
 
@@ -276,7 +283,10 @@ const Relatorios = () => {
   const exportTonerCSV = async () => {
     try {
       const rep = tonerReport || (await getTonerUsageReport(dateStart || null, dateEnd || null));
-      if (!rep) return alert("Sem dados de toner para exportar");
+      if (!rep) {
+        showDialog("Sem dados", "Sem dados de toner para exportar.");
+        return;
+      }
 
       // CSV principal (estoque e stats)
       const lines = [["ID","Modelo","SKU","Estoque","Entradas","Consumo","Tempo_medio_dias"]];
@@ -320,7 +330,7 @@ const Relatorios = () => {
       saveAs(blob, `relatorio-toners.csv`);
     } catch (err) {
       console.error(err);
-      alert("Erro ao exportar CSV toners");
+      showDialog("Falha ao exportar CSV", "Erro ao exportar CSV de toners.");
     }
   };
 
@@ -583,6 +593,13 @@ const Relatorios = () => {
         </div>
       )}
       {/* --------------------------------------------------- */}
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
+      />
 
     </div>
   );

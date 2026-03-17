@@ -3,12 +3,14 @@ import { FaRegThumbsUp, FaCommentAlt, FaTrash, FaEdit, FaSave, FaTimes } from "r
 import api from "../services/api";
 import { getCurrentUser } from "../auth";
 import { motion } from "framer-motion";
+import InfoModal from "./InfoModal";
 
 const ProjetoCard = ({ projeto, onUpdate }) => {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [editingIndex, setEditingIndex] = useState(null);
   const [editedComment, setEditedComment] = useState("");
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
   const user = getCurrentUser();
 
   // Função auxiliar — garante compatibilidade com strings antigas
@@ -23,7 +25,7 @@ const ProjetoCard = ({ projeto, onUpdate }) => {
 
   const handleLike = async () => {
     if (projeto.likedBy?.includes(user.username)) {
-      alert("Você já curtiu este projeto!");
+      setDialog({ open: true, title: "Atenção", message: "Você já curtiu este projeto!" });
       return;
     }
 
@@ -195,6 +197,13 @@ const ProjetoCard = ({ projeto, onUpdate }) => {
           </div>
         </motion.div>
       )}
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
+      />
     </motion.div>
   );
 };
