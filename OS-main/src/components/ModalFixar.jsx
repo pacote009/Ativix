@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { getUsers, assignAtividade } from "../services/api";
+import InfoModal from "./InfoModal";
 
 const ModalFixar = ({ atividade, onClose, onUpdate }) => {
   const [usuarios, setUsuarios] = useState([]);
   const [selectedUser, setSelectedUser] = useState("");
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -15,7 +17,7 @@ const ModalFixar = ({ atividade, onClose, onUpdate }) => {
 
   const handleFixar = async () => {
     if (!selectedUser) {
-      alert("Selecione um usuário!");
+      setDialog({ open: true, title: "Campo obrigatório", message: "Selecione um usuário." });
       return;
     }
     await assignAtividade(atividade.id, selectedUser);
@@ -54,6 +56,13 @@ const ModalFixar = ({ atividade, onClose, onUpdate }) => {
           </button>
         </div>
       </div>
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
+      />
     </div>
   );
 };

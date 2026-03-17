@@ -1,5 +1,6 @@
 // src/components/QuickAdjustModal.jsx
 import React, { useEffect, useState } from "react";
+import InfoModal from "./InfoModal";
 
 /**
  * QuickAdjustModal
@@ -32,6 +33,9 @@ export default function QuickAdjustModal({
   const [note, setNote] = useState(defaultNote || "");
   const [destination, setDestination] = useState("");
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
+
+  const showDialog = (title, message) => setDialog({ open: true, title, message });
 
   useEffect(() => {
     if (open) {
@@ -46,9 +50,13 @@ export default function QuickAdjustModal({
   const handleSubmit = async (type) => {
     if (busy) return;
     const q = Number(qty) || 0;
-    if (q <= 0) return alert("Informe uma quantidade válida (maior que zero).");
+    if (q <= 0) {
+      showDialog("Quantidade inválida", "Informe uma quantidade válida (maior que zero).");
+      return;
+    }
     if ((type === "consumo" || type === "instalacao") && showDestination && (!destination || !destination.trim())) {
-      return alert("Informe o destino / local para registrar a saída.");
+      showDialog("Campo obrigatório", "Informe o destino / local para registrar a saída.");
+      return;
     }
 
     setBusy(true);
@@ -117,6 +125,13 @@ export default function QuickAdjustModal({
           )}
         </div>
       </div>
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
+      />
     </div>
   );
 }

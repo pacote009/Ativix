@@ -1,6 +1,7 @@
 // src/components/MovementModal.jsx
 import React, { useState, useEffect } from "react";
 import { addTonerMovement } from "../services/api";
+import InfoModal from "./InfoModal";
 
 export default function MovementModal({ open, onClose, toner, defaultType = "consumo", onSuccess }) {
   const [type, setType] = useState(defaultType);
@@ -10,6 +11,9 @@ export default function MovementModal({ open, onClose, toner, defaultType = "con
   const [note, setNote] = useState("");
   const [printerId, setPrinterId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
+
+  const showDialog = (title, message) => setDialog({ open: true, title, message });
 
   useEffect(() => {
     if (open) {
@@ -31,16 +35,19 @@ export default function MovementModal({ open, onClose, toner, defaultType = "con
     // validações obrigatórias para saída (saída = consumo/instalacao/troca)
     if (isExitType(type)) {
       if (!destination || String(destination).trim() === "") {
-        return alert("Destino é obrigatório para registrar saída.");
+        showDialog("Campo obrigatório", "Destino é obrigatório para registrar saída.");
+        return;
       }
       if (!note || String(note).trim() === "") {
-        return alert("Observação é obrigatória para registrar saída.");
+        showDialog("Campo obrigatório", "Observação é obrigatória para registrar saída.");
+        return;
       }
     }
 
     // evitar quantidade inválida
     if (!quantity || Number(quantity) <= 0) {
-      return alert("Quantidade deve ser um número maior que zero.");
+      showDialog("Quantidade inválida", "Quantidade deve ser um número maior que zero.");
+      return;
     }
 
     try {
@@ -60,7 +67,7 @@ export default function MovementModal({ open, onClose, toner, defaultType = "con
       setLoading(false);
       console.error("Erro cadastrar movimento:", err);
       const msg = err?.response?.data?.error || err?.message || "Erro ao registrar movimentação";
-      alert(msg);
+      showDialog("Falha ao registrar movimentação", msg);
     }
   };
 
@@ -120,6 +127,13 @@ export default function MovementModal({ open, onClose, toner, defaultType = "con
           </div>
         </div>
       </div>
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
+      />
     </div>
   );
 }

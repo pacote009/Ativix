@@ -15,7 +15,34 @@ import equipamentosRoutes from './routes/equipamentos.js';
 
 const app = express();
 
-app.use(cors());
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET não configurado. Defina JWT_SECRET antes de iniciar o backend.');
+}
+
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Permite requests server-to-server (sem Origin) e ambientes locais controlados
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origem não permitida por CORS'));
+  },
+  credentials: true,
+}));
+
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 
 // --- ALTERAÇÃO AQUI ---
 // Aumentamos o limite para 50mb para aceitar imagens em Base64

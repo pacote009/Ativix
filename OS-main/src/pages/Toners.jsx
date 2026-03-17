@@ -13,6 +13,7 @@ import {
 } from "../services/api";
 import { FaPlus } from "react-icons/fa";
 import { motion } from "framer-motion";
+import InfoModal from "../components/InfoModal";
 
 export default function TonersPage() {
   const [toners, setToners] = useState([]);
@@ -21,6 +22,9 @@ export default function TonersPage() {
   const [editing, setEditing] = useState(null);
   const [openHistoryModal, setOpenHistoryModal] = useState(false);
   const [historyToner, setHistoryToner] = useState(null);
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
+
+  const showDialog = (title, message) => setDialog({ open: true, title, message });
 
   const load = async () => {
     setLoading(true);
@@ -74,7 +78,7 @@ const handleQuickAdjust = async (tonerId, type, quantity, meta = {}) => {
         msg = err.details;
       }
     } catch (e) {}
-    alert(msg);
+    showDialog("Falha ao registrar movimentação", msg);
   }
 };
 
@@ -154,6 +158,13 @@ const handleQuickAdjust = async (tonerId, type, quantity, meta = {}) => {
         toner={historyToner}
         onClose={() => setOpenHistoryModal(false)}
         onSaved={() => { setOpenHistoryModal(false); load(); }}
+      />
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
       />
     </div>
   );

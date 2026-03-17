@@ -10,6 +10,7 @@ import { getCurrentUser } from "../auth";
 import ModalAlterarUsuario from "./ModalAlterarUsuario";
 import { FaTrash, FaEdit, FaCheck, FaUserEdit, FaThumbtack } from "react-icons/fa";
 import { motion } from "framer-motion";
+import InfoModal from "./InfoModal";
 
 const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpdate }) => {
   const user = getCurrentUser() || { username: "Desconhecido", role: "user" };
@@ -19,6 +20,9 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
   const [editText, setEditText] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [dialog, setDialog] = useState({ open: false, title: "", message: "" });
+
+  const showDialog = (title, message) => setDialog({ open: true, title, message });
 
   // === NOVA LÓGICA DE PERMISSÃO ===
   // Pode deletar se: É Admin OU (É o autor E a atividade está pendente)
@@ -46,7 +50,7 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
       if (typeof onGlobalUpdate === "function") onGlobalUpdate();
     } catch (err) {
       console.error("Erro ao concluir atividade:", err);
-      alert("Erro ao concluir a atividade.");
+      showDialog("Falha ao concluir atividade", "Não foi possível concluir a atividade. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -63,9 +67,9 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
       console.error("Erro ao deletar:", err);
       const code = err?.response?.status;
       if (code === 403) {
-        alert("Você não tem permissão para excluir esta atividade.");
+        showDialog("Sem permissão", "Você não tem permissão para excluir esta atividade.");
       } else {
-        alert("Erro ao deletar atividade.");
+        showDialog("Falha ao excluir atividade", "Não foi possível excluir a atividade. Tente novamente.");
       }
     } finally {
       setDeleting(false);
@@ -81,7 +85,7 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
       await safeOnUpdate();
     } catch (err) {
       console.error("Erro ao adicionar comentário:", err);
-      alert("Erro ao adicionar comentário.");
+      showDialog("Falha ao adicionar comentário", "Não foi possível adicionar o comentário.");
     }
   };
 
@@ -256,6 +260,13 @@ const AtividadeCard = ({ atividade, onUpdate, onFixar, onConcluded, onGlobalUpda
           <button onClick={handleAddComentario} className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm">Enviar</button>
         </div>
       </div>
+
+      <InfoModal
+        open={dialog.open}
+        title={dialog.title || "Aviso"}
+        message={dialog.message}
+        onClose={() => setDialog({ open: false, title: "", message: "" })}
+      />
     </motion.div>
   );
 };
